@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Models;
+namespace App\Controllers;
+use App\Domain\Models\CustomerModel;
 
 
 class CustomerController
