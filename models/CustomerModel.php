@@ -92,7 +92,7 @@ class CustomerModel
         return $this->createdAt;
     }
 
-    public function setCreatedAt(?string $createdAt): void
+    public function setCreatedAt(string $createdAt): void
     {
         $this->createdAt = $createdAt;
     }
