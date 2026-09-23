@@ -126,7 +126,7 @@
 
         try {
 
-            const response = await fetch("../public/index.php?action=addCustomer", {
+            const response = await fetch("../index.php?action=addCustomer", {
                 method: "POST",
                 body: formData
             });
