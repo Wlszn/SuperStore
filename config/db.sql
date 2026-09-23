@@ -5,6 +5,7 @@ Create Table Customers (
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
+    address VARCHAR(255),
     phone_number VARCHAR(15),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -18,10 +19,10 @@ Create Table Products (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-Insert Into Customers (first_name, last_name, email, phone_number) Values
-('John', 'Doe', 'john.doe@example.com', '123-456-7890'),
-('Jane', 'Smith', 'jane.smith@example.com', '098-765-4321'),
-('Alice', 'Johnson', 'alice.johnson@example.com', '555-555-5555');
+Insert Into Customers (first_name, last_name, email, phone_number, address) Values
+('John', 'Doe', 'john.doe@example.com', '123-456-7890', '123 Main St'),
+('Jane', 'Smith', 'jane.smith@example.com', '098-765-4321', '456 Oak Ave'),
+('Alice', 'Johnson', 'alice.johnson@example.com', '555-555-5555', '789 Pine Rd');
 
 
 
