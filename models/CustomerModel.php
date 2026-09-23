@@ -14,16 +14,18 @@ class CustomerModel
     private string $email;
     private string $phone;
     private string $address;
+    private time $createdAt;
 
     private static ?PDO $dbConnection = null;
 
-    public function __construct(?int $id, string $name, string $email, string $phone, string $address)
+    public function __construct(?int $id, string $name, string $email, string $phone, string $address, time $createdAt = null)
     {
         $this->id = $id;
         $this->name = $name;
         $this->email = $email;
         $this->phone = $phone;
         $this->address = $address;
+        $this->createdAt = $createdAt ?? time();
     }
 
     public static function setDbConnection(PDO $connection): void
@@ -85,6 +87,16 @@ class CustomerModel
         $this->address = $address;
     }
 
+    public function getCreatedAt(): time
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(time $createdAt): void
+    {
+        $this->createdAt = $createdAt;
+    }
+
     public function isValid(): bool
     {
         if (trim($this->name) === '') {
@@ -121,13 +133,14 @@ class CustomerModel
     public function create(): bool
     {
         $stmt = self::getDbConnection()->prepare(
-            'INSERT INTO customers (name, email, phone, address) VALUES (:name, :email, :phone, :address)'
+            'INSERT INTO customers (name, email, phone, address, createdAt) VALUES (:name, :email, :phone, :address, :createdAt)'
         );
         $success = $stmt->execute([
             ':name' => $this->name,
             ':email' => $this->email,
             ':phone' => $this->phone,
             ':address' => $this->address,
+            ':createdAt' => $this->createdAt,
         ]);
 
         if ($success) {
@@ -155,7 +168,7 @@ class CustomerModel
         }
 
         $stmt = self::getDbConnection()->prepare(
-            'UPDATE customers SET name = :name, email = :email, phone = :phone, address = :address WHERE id = :id'
+            'UPDATE customers SET name = :name, email = :email, phone = :phone, address = :address, createdAt = :createdAt WHERE id = :id'
         );
         return $stmt->execute([
             ':id' => $this->id,
@@ -163,6 +176,7 @@ class CustomerModel
             ':email' => $this->email,
             ':phone' => $this->phone,
             ':address' => $this->address,
+            ':createdAt' => $this->createdAt,
         ]);
     }
 
@@ -178,7 +192,8 @@ class CustomerModel
                 $data['name'],
                 $data['email'],
                 $data['phone'],
-                $data['address']
+                $data['address'],
+                $data['createdAt']
             );
         }
         return null;
@@ -192,6 +207,7 @@ class CustomerModel
             'email' => $this->email,
             'phone' => $this->phone,
             'address' => $this->address,
+            'createdAt' => $this->createdAt,
         ];
     }
 
