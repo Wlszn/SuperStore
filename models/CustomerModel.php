@@ -14,18 +14,18 @@ class CustomerModel
     private string $email;
     private string $phone;
     private string $address;
-    private time $createdAt;
+    private string $createdAt;
 
     private static ?PDO $dbConnection = null;
 
-    public function __construct(?int $id, string $name, string $email, string $phone, string $address, time $createdAt = null)
+    public function __construct(?int $id, string $name, string $email, string $phone, string $address, ?string $createdAt = null)
     {
         $this->id = $id;
         $this->name = $name;
         $this->email = $email;
         $this->phone = $phone;
         $this->address = $address;
-        $this->createdAt = $createdAt ?? time();
+        $this->createdAt = $createdAt ?? date('Y-m-d H:i:s');
     }
 
     public static function setDbConnection(PDO $connection): void
@@ -87,12 +87,12 @@ class CustomerModel
         $this->address = $address;
     }
 
-    public function getCreatedAt(): time
+    public function getCreatedAt(): ?string
     {
         return $this->createdAt;
     }
 
-    public function setCreatedAt(time $createdAt): void
+    public function setCreatedAt(string $createdAt): void
     {
         $this->createdAt = $createdAt;
     }

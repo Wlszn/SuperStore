@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Models;
+namespace App\Controllers;
+use App\Domain\Models\CustomerModel;
 
 
 class CustomerController
 {
 
-    private const GPIO_SCRIPT = __DIR__ . '/../scripts/gpio_control.py';
+    private const GPIO_SCRIPT = __DIR__ . '/../scripts/gpio_signal.py';
 
     public function addCustomer(): void
     {
