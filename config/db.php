@@ -21,12 +21,23 @@ $dbname = $_ENV['DB_NAME'] ?? 'superstore';
 
 
 try {
+    //connect to MySQL server without specifying a database to create it if it doesn't exist
+    $bootstrap = new PDO("mysql:host={$host};port={$port};charset=utf8mb4", $user, $pass);
+    $bootstrap->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $bootstrap->exec("CREATE DATABASE IF NOT EXISTS {$dbname}");
+
+    //connect to the newly created database
     $pdo = new PDO(
         "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4",
         $user,
         $pass
     );
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    $sql = file_get_contents(__DIR__ . '/db.sql');
+    foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
+        $pdo->exec($statement);
+    }
 } catch (PDOException $e) {
     http_response_code(500);
     header('Content-Type: application/json');
