@@ -13,11 +13,11 @@ if (file_exists($envPath)) {
     }
 }
 
-$host = $_ENV['DB_HOST'] ?? 'localhost';
-$port = $_ENV['DB_PORT'] ?? '3306';
-$user = $_ENV['DB_USER'] ?? 'root';
-$pass = $_ENV['DB_PASS'] ?? '';
-$dbname = $_ENV['DB_NAME'] ?? 'superstore';
+$host = $_ENV['DB_HOST'] ;
+$port = $_ENV['DB_PORT'] ;
+$user = $_ENV['DB_USER'] ;
+$pass = $_ENV['DB_PASS'];
+$dbname = $_ENV['DB_NAME'];
 
 
 try {
