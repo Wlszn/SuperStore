@@ -1,12 +1,3 @@
-CREATE TABLE customers (
-  id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  name        VARCHAR(50) NOT NULL,
-  email       VARCHAR(100) NOT NULL UNIQUE,
-  address     VARCHAR(255),
-  phone       VARCHAR(15),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 CREATE TABLE fridge (
   id        INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name      VARCHAR(50) NOT NULL UNIQUE,
@@ -37,12 +28,20 @@ CREATE TABLE alerts (
                CHECK (response IN ('pending','yes','no'))
 );
 
-
-INSERT INTO customers (name, email, phone, address) VALUES
-('John Doe',      'john.doe@example.com',      '123-456-7890', '123 Main St'),
-('Jane Smith',    'jane.smith@example.com',    '098-765-4321', '456 Oak Ave'),
-('Alice Johnson', 'alice.johnson@example.com', '555-555-5555', '789 Pine Rd');
-
 INSERT INTO fridge (name, max_temp) VALUES ('Frig1', 8.0), ('Frig2', 8.0);
 INSERT INTO fan_state (id, is_on) VALUES (1, FALSE);
 
+Create Table customers (
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    address VARCHAR(255),
+    phone VARCHAR(15),
+    password_hash VARCHAR(255) NOT NULL DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+Insert Into customers (name, email, phone, address, created_at) Values
+('Iulia Api', 'iuliaapi@gmail.com', '123-456-7890', '246 Boul Sam', NOW()),
+('Sam Wil', 'samWil@gmail.com', '098-765-4321', '964 Sherb Ave', NOW()),
+('Will', 'will102@yahoo.com', '555-555-5555', '876 St-Jean Rd', NOW());
