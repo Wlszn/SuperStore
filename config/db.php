@@ -13,48 +13,99 @@ if (file_exists($envPath)) {
     }
 }
 
-$host = $_ENV['DB_HOST'] ?? 'localhost';
-$port = $_ENV['DB_PORT'] ?? '3306';
-$user = $_ENV['DB_USER'] ?? 'root';
-$pass = $_ENV['DB_PASS'] ?? '';
-$dbname = $_ENV['DB_NAME'] ?? 'superstore';
+define('SUPABASE_URL', rtrim($_ENV['SUPABASE_URL'] ?? '', '/'));
+define('SUPABASE_KEY', $_ENV['SUPABASE_KEY'] ?? '');
 
-
-try {
-    $pdo = new PDO(
-        "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4",
-        $user,
-        $pass
-    );
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
+if (SUPABASE_URL === '' || SUPABASE_KEY === '') {
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode(['status' => 'error', 'message' => 'Database connection failed.']);
     exit;
 }
 
+/**
+ * Minimal HTTP helper using cURL. Returns [statusCode, decodedBody].
+ */
+function supa_request(string $method, string $path, ?array $query = null, ?array $body = null): array
+{
+    $url = SUPABASE_URL . '/rest/v1/' . $path;
+    if ($query) {
+        $url .= '?' . http_build_query($query);
+    }
 
-// Connect (no database yet, since we're creating it)
-// $conn = new mysqli($host, $user, $pass);
+    $headers = [
+        'apikey: ' . SUPABASE_KEY,
+        'Authorization: Bearer ' . SUPABASE_KEY,
+        'Content-Type: application/json',
+    ];
 
-// if ($conn->connect_error) {
-//     die("Connection failed: " . $conn->connect_error);
-// }
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_TIMEOUT => 15,
+    ]);
 
-// // 1. Create database
-// $conn->query("CREATE DATABASE IF NOT EXISTS superstore");
-// $conn->select_db('superstore');
+    if ($body !== null) {
+        // Return the affected row(s) so we get the new id back on insert.
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array_merge($headers, ['Prefer: return=representation']));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    }
 
-// // 2. Create table
-// $db = new PDO("mysql:host=$host;dbname=superstore", $user, $pass);
-// $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $raw = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
 
-// $sql = file_get_contents(__DIR__ . '/db.sql');
+    if ($raw === false) {
+        error_log('Supabase request error: ' . $err);
+        return [0, null];
+    }
 
-// try {
-//     $db->exec($sql);
-//     echo "Database and table created successfully.";
-// } catch (PDOException $e) {
-//     echo "Error creating database or table: " . $e->getMessage();
-// }
+    $decoded = json_decode($raw, true);
+    return [$code, is_array($decoded) ? $decoded : null];
+}
+
+/** Fetch one customer row by email, or null. */
+function supa_find_customer_by_email(string $email): ?array
+{
+    [$code, $rows] = supa_request('GET', 'customers', [
+        'select' => '*',
+        'email' => 'eq.' . $email,
+        'limit' => 1,
+    ]);
+    return ($code === 200 && !empty($rows)) ? $rows[0] : null;
+}
+
+/** Fetch one customer row by id, or null. */
+function supa_find_customer_by_id(int $id): ?array
+{
+    [$code, $rows] = supa_request('GET', 'customers', [
+        'select' => '*',
+        'id' => 'eq.' . $id,
+        'limit' => 1,
+    ]);
+    return ($code === 200 && !empty($rows)) ? $rows[0] : null;
+}
+
+/** Insert a customer row. Returns the created row, or null on failure. */
+function supa_insert_customer(array $row): ?array
+{
+    [$code, $rows] = supa_request('POST', 'customers', null, $row);
+    return (($code === 201 || $code === 200) && !empty($rows)) ? $rows[0] : null;
+}
+
+/** Update a customer row by id. Returns true on success. */
+function supa_update_customer(int $id, array $row): bool
+{
+    [$code] = supa_request('PATCH', 'customers', ['id' => 'eq.' . $id], $row);
+    return $code === 200 || $code === 204;
+}
+
+/** Delete a customer row by id. Returns true on success. */
+function supa_delete_customer(int $id): bool
+{
+    [$code] = supa_request('DELETE', 'customers', ['id' => 'eq.' . $id]);
+    return $code === 200 || $code === 204;
+}
