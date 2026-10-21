@@ -16,20 +16,20 @@ Each phase adds functionality on top of the last, moving from data capture, to d
 | Layer | Choice |
 |---|---|
 | Backend | PHP (MVC) |
-| Database | MySQL, hosted on Railway |
+| Database | PostgreSQL, hosted on Supabase |
 | Hardware | Raspberry Pi 5 (per team member) |
 | Hardware control | Python |
 | Front-end | HTML/CSS/JS |
 
-The web app and GPIO scripts run locally on each Raspberry Pi, while the MySQL database is centralized on Railway so the whole team works against the same shared data.
+The web app and GPIO scripts run locally on each Raspberry Pi, while the Postgres database is centralized on Supabase so the whole team works against the same shared data.
 
 ## Phase 1 — Customer Registration
 
 Scope of the current phase:
 
 - Design the customer database (name, address, phone, email, etc.)
-- Build a page to add new customers
-- On successful insert:
+- Build sign-up and login pages (creating an account registers the customer)
+- On successful registration:
   - Store the data in the database
   - Show a confirmation notification
   - Turn on a **blue LED**
@@ -43,13 +43,16 @@ Scope of the current phase:
 ```
 SuperStore/
 ├── config/
-│   └── db.php              # Railway MySQL connection (via .env)
+│   └── db.php              # Supabase REST client (via .env)
 ├── controllers/
-│   └── CustomerController.php
+│   └── AuthController.php  # register / login / logout
 ├── models/
-│   └── Customer.php
+│   └── CustomerModel.php
 ├── views/
-│   └── add_customer.php
+│   ├── login.php
+│   ├── signup.php
+│   ├── dashboard.php
+│   └── assets/             # shared css + js
 ├── scripts/
 │   └── gpio_signal.py      # Drives blue/red LED + buzzer via gpiozero
 ├── .env.example
@@ -59,7 +62,7 @@ SuperStore/
 
 ## Setup
 
-1. Clone the repo and copy `.env.example` to `.env`, filling in the Railway MySQL credentials.
+1. Clone the repo and copy `.env.example` to `.env`, filling in the Supabase Postgres credentials (Supabase dashboard → Project Settings → Database).
 2. Install PHP dependencies (if any) and ensure `python3-gpiozero` is installed on the Pi.
 3. Run the app locally via Apache/PHP's built-in server on the Pi.
 4. Wire the LEDs and buzzer per the pinout in `scripts/gpio_signal.py`.
