@@ -4,6 +4,7 @@ declare(strict_types=1);
 session_start();
 
 use App\Controllers\AuthController;
+use App\Controllers\ThresholdController;
 
 // Project root = one level above public/
 define('APP_ROOT', dirname(__DIR__));
@@ -23,7 +24,7 @@ spl_autoload_register(function (string $class): void {
     $file  = array_pop($parts);                                    // 'Fridge'
     $dir   = $parts ? strtolower(implode('/', $parts)) . '/' : ''; // 'models/'
 
-    $path = APP_ROOT . '/app/' . $dir . $file . '.php';
+    $path = APP_ROOT . '/App/' . $dir . $file . '.php';
     if (is_file($path)) {
         require $path;
     }
@@ -44,7 +45,7 @@ function jsonResponse(int $status, array $body): void
 
 function view(string $name): void
 {
-    require APP_ROOT . '/app/views/' . $name . '.php';
+    require APP_ROOT . '/App/Views/' . $name . '.php';
 }
 
 $routes = [
@@ -60,10 +61,11 @@ $routes = [
     'POST /login'    => [AuthController::class, 'login'],
     'GET /logout'    => [AuthController::class, 'logout'],
 
+    'GET /thresholds'     => [ThresholdController::class, 'index'],
+    'POST /thresholds'    => [ThresholdController::class, 'update'],
+    'GET /api/thresholds' => [ThresholdController::class, 'json'],
+
     // Added as each controller is written:
-    // 'GET /thresholds'  => [ThresholdController::class, 'index'],
-    // 'POST /api/readings' => [ReadingApiController::class, 'store'],
-    // 'GET /api/thresholds' => [ThresholdController::class, 'json'],
     // 'GET /api/fan'     => [FanApiController::class, 'show'],
     // 'POST /api/fan'    => [FanApiController::class, 'update'],
 ];

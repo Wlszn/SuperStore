@@ -3,24 +3,29 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\SupaClient;
 use InvalidArgumentException;
-use PDO;
 
+/**
+ * Fridge model: the only place that talks to the `fridge` table.
+ * Controllers call these methods and never build requests themselves.
+ */
 class Fridge
 {
-    //limits for a fridge threshold (°C).
+    private const TABLE = 'fridge';
+    private const COLUMNS = 'id,name,max_temp';
+
+    // Sanity limits for a fridge threshold (°C). The column is NUMERIC(4,1).
     private const MIN_TEMP = -30.0;
     private const MAX_TEMP = 50.0;
-
-    public function __construct(private PDO $pdo)
-    {
-    }
 
     /** All fridges, e.g. for the threshold settings page. */
     public function all(): array
     {
-        $stmt = $this->pdo->query('SELECT id, name, max_temp FROM fridge ORDER BY id');
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = SupaClient::rows('GET', self::TABLE, [
+            'select' => self::COLUMNS,
+            'order'  => 'id.asc',
+        ]);
 
         return array_map([$this, 'normalize'], $rows);
     }
@@ -28,21 +33,25 @@ class Fridge
     /** One fridge by id, or null if it doesn't exist. */
     public function find(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, name, max_temp FROM fridge WHERE id = :id');
-        $stmt->execute(['id' => $id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $rows = SupaClient::rows('GET', self::TABLE, [
+            'select' => self::COLUMNS,
+            'id'     => 'eq.' . $id,
+            'limit'  => 1,
+        ]);
 
-        return $row === false ? null : $this->normalize($row);
+        return $rows ? $this->normalize($rows[0]) : null;
     }
 
     /** One fridge by name ('Frig1' / 'Frig2'), matching the MQTT topic. */
     public function findByName(string $name): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, name, max_temp FROM fridge WHERE name = :name');
-        $stmt->execute(['name' => $name]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $rows = SupaClient::rows('GET', self::TABLE, [
+            'select' => self::COLUMNS,
+            'name'   => 'eq.' . $name,
+            'limit'  => 1,
+        ]);
 
-        return $row === false ? null : $this->normalize($row);
+        return $rows ? $this->normalize($rows[0]) : null;
     }
 
     /**
@@ -59,12 +68,15 @@ class Fridge
             );
         }
 
-        $stmt = $this->pdo->prepare('UPDATE fridge SET max_temp = :max_temp WHERE id = :id');
-        $stmt->execute(['max_temp' => $maxTemp, 'id' => $id]);
+        // PATCH returns the updated rows; an empty list means no fridge had that id.
+        $rows = SupaClient::rows('PATCH', self::TABLE, ['id' => 'eq.' . $id], [
+            'max_temp' => round($maxTemp, 1),
+        ]);
 
-        return $stmt->rowCount() > 0;
+        return $rows !== [];
     }
 
+    /** Make sure every value has a predictable PHP type. */
     private function normalize(array $row): array
     {
         $row['id'] = (int) $row['id'];

@@ -1,15 +1,9 @@
-
 async function postForm(action, form) {
-    const response = await fetch('../index.php?action=' + encodeURIComponent(action), {
+    const response = await fetch('/' + action, {
         method: 'POST',
-        body: new FormData(form)
+        body: new FormData(form),
     });
-
-    try {
-        return await response.json();
-    } catch (parseError) {
-        throw new Error('The server returned an unexpected response.');
-    }
+    return response.json();
 }
 
 /** Removes every error message and red border from a form. */
