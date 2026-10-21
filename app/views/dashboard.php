@@ -1,5 +1,4 @@
 <?php
-session_start();
 
 // This page is only for signed-in users.
 if (!isset($_SESSION['customer_id'])) {
@@ -27,6 +26,7 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
     <span class="brand">SuperStore</span>
     <span>
         <a href="../index.php?action=logout">Sign out</a>
+        <a href="/thresholds">Fridge thresholds</a>
     </span>
 </div>
 
