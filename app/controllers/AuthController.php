@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use App\Domain\Models\CustomerModel;
+use App\Models\CustomerModel;
 
 class AuthController
 {
-    private const GPIO_SCRIPT = __DIR__ . '/../scripts/gpio_signal.py';
-
+    private const GPIO_SCRIPT = __DIR__ . '/../../scripts/gpio_signal.py';
     public function register(): void
     {
         header('Content-Type: application/json');
@@ -81,7 +80,7 @@ class AuthController
         echo json_encode([
             'status' => 'success',
             'message' => 'Your account was created. Taking you to your dashboard...',
-            'redirect' => 'dashboard.php',
+            'redirect' => '/dashboard',
         ]);
     }
 
@@ -141,7 +140,7 @@ class AuthController
         echo json_encode([
             'status' => 'success',
             'message' => 'Welcome back, ' . $customer->getName() . '! Signing you in...',
-            'redirect' => 'dashboard.php',
+            'redirect' => '/dashboard',
         ]);
     }
 
@@ -149,7 +148,7 @@ class AuthController
     {
         $_SESSION = [];
         session_destroy();
-        header('Location: views/login.php');
+        header('Location: /login');
         exit;
     }
 
