@@ -24,7 +24,7 @@ spl_autoload_register(function (string $class): void {
     $file  = array_pop($parts);                                    // 'Fridge'
     $dir   = $parts ? strtolower(implode('/', $parts)) . '/' : ''; // 'models/'
 
-    $path = APP_ROOT . '/App/' . $dir . $file . '.php';
+    $path = APP_ROOT . '/app/' . $dir . $file . '.php';
     if (is_file($path)) {
         require $path;
     }
@@ -45,7 +45,7 @@ function jsonResponse(int $status, array $body): void
 
 function view(string $name): void
 {
-    require APP_ROOT . '/App/Views/' . $name . '.php';
+    require APP_ROOT . '/app/views/' . $name . '.php';
 }
 
 $routes = [
