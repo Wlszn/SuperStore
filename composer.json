@@ -1,0 +1,12 @@
+{
+    "name": "superstore/superstore",
+    "description": "A smart-store simulation built for the Internet of Things course (420-521-VA, Vanier College) final project",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Superstore\\Superstore\\": "app/"
+        }
+    },
+    "minimum-stability": "alpha",
+    "require": {}
+}
