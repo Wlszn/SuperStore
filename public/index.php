@@ -5,15 +5,13 @@ session_start();
 
 use App\Controllers\AuthController;
 use App\Controllers\ThresholdController;
+use App\Controllers\ReadingApiController;
+use App\Controllers\FanApiController;
+
 
 // Project root = one level above public/
 define('APP_ROOT', dirname(__DIR__));
 
-// ---------------------------------------------------------------------------
-// Autoloader: App\Models\Fridge -> app/models/Fridge.php
-// Folder names are lowercased (they are lowercase on disk and Linux is
-// case-sensitive); the class file name keeps its case.
-// ---------------------------------------------------------------------------
 spl_autoload_register(function (string $class): void {
     $prefix = 'App\\';
     if (strncmp($class, $prefix, strlen($prefix)) !== 0) {
@@ -21,8 +19,8 @@ spl_autoload_register(function (string $class): void {
     }
 
     $parts = explode('\\', substr($class, strlen($prefix)));       // ['Models', 'Fridge']
-    $file  = array_pop($parts);                                    // 'Fridge'
-    $dir   = $parts ? strtolower(implode('/', $parts)) . '/' : ''; // 'models/'
+    $file = array_pop($parts);                                    // 'Fridge'
+    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : ''; // 'models/'
 
     $path = APP_ROOT . '/app/' . $dir . $file . '.php';
     if (is_file($path)) {
@@ -49,25 +47,27 @@ function view(string $name): void
 }
 
 $routes = [
-    'GET /' => fn() => jsonResponse(200, ['status' => 'success', 'message' => 'SuperStore API']),
+    'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? '/dashboard' : '/login')),
 
     // Pages
-    'GET /login'     => fn() => view('login'),
-    'GET /signup'    => fn() => view('signup'),
+    'GET /login' => fn() => view('login'),
+    'GET /signup' => fn() => view('signup'),
     'GET /dashboard' => fn() => view('dashboard'),
 
     // Actions
     'POST /register' => [AuthController::class, 'register'],
-    'POST /login'    => [AuthController::class, 'login'],
-    'GET /logout'    => [AuthController::class, 'logout'],
+    'POST /login' => [AuthController::class, 'login'],
+    'GET /logout' => [AuthController::class, 'logout'],
 
-    'GET /thresholds'     => [ThresholdController::class, 'index'],
-    'POST /thresholds'    => [ThresholdController::class, 'update'],
+    'GET /thresholds' => [ThresholdController::class, 'index'],
+    'POST /thresholds' => [ThresholdController::class, 'update'],
     'GET /api/thresholds' => [ThresholdController::class, 'json'],
 
-    // Added as each controller is written:
-    // 'GET /api/fan'     => [FanApiController::class, 'show'],
-    // 'POST /api/fan'    => [FanApiController::class, 'update'],
+    'POST /api/readings' => [ReadingApiController::class, 'store'],
+    'GET /api/readings/latest' => [ReadingApiController::class, 'latest'],
+
+    'GET /api/fan'     => [FanApiController::class, 'show'],
+    'POST /api/fan'    => [FanApiController::class, 'update'],
 ];
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
@@ -75,7 +75,7 @@ if ($path !== '/' && str_ends_with($path, '/')) {
     $path = rtrim($path, '/');
 }
 
-$method  = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $handler = $routes["$method $path"] ?? null;
 
 if ($handler === null) {

@@ -2,7 +2,7 @@
 
 // This page is only for signed-in users.
 if (!isset($_SESSION['customer_id'])) {
-    header('Location: login.php');
+    header('Location: /login');
     exit;
 }
 
@@ -25,7 +25,7 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
 <div class="topbar">
     <span class="brand">SuperStore</span>
     <span>
-        <a href="../index.php?action=logout">Sign out</a>
+        <a href="/logout">Sign out</a>
         <a href="/thresholds">Fridge thresholds</a>
     </span>
 </div>
