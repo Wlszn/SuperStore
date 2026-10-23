@@ -28,7 +28,7 @@ class ReadingApiController
         $data = json_decode((string) file_get_contents('php://input'), true);
         if (!is_array($data)) {
             jsonResponse(400, [
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Send a JSON body like {"fridge":"Frig1","temp":4.0,"hum":55.0}.',
             ]);
             return;
@@ -48,9 +48,9 @@ class ReadingApiController
 
         if ($errors !== []) {
             jsonResponse(422, [
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'The reading is incomplete.',
-                'errors'  => $errors,
+                'errors' => $errors,
             ]);
             return;
         }
@@ -72,7 +72,12 @@ class ReadingApiController
             return;
         }
 
-        jsonResponse(201, ['status' => 'success', 'reading' => $reading]);
+        jsonResponse(201, [
+            'status' => 'success',
+            'reading' => $reading,
+            'max_temp' => $fridge['max_temp'],
+            'over_threshold' => $reading['temperature'] > $fridge['max_temp'],
+        ]);
     }
 
     /** GET /api/readings/latest: everything the dashboard needs in one call. */
@@ -83,18 +88,18 @@ class ReadingApiController
                 $reading = $this->readings->latestByFridge($fridge['id']);
 
                 return [
-                    'id'             => $fridge['id'],
-                    'name'           => $fridge['name'],
-                    'max_temp'       => $fridge['max_temp'],
-                    'reading'        => $reading,   // null until the fridge has sent something
+                    'id' => $fridge['id'],
+                    'name' => $fridge['name'],
+                    'max_temp' => $fridge['max_temp'],
+                    'reading' => $reading,   // null until the fridge has sent something
                     'over_threshold' => $reading !== null && $reading['temperature'] > $fridge['max_temp'],
                 ];
             }, $this->fridges->all());
 
             jsonResponse(200, [
-                'status'  => 'success',
+                'status' => 'success',
                 'fridges' => $fridges,
-                'fan'     => $this->fan->current(),
+                'fan' => $this->fan->current(),
             ]);
         } catch (RuntimeException $e) {
             jsonResponse(500, ['status' => 'error', 'message' => 'Could not load the latest readings.']);
