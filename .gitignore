@@ -2,5 +2,9 @@
 .env
 .env.*
 !.env.example
+<<<<<<< HEAD
 
 /vendor/
+=======
+smoke_test.php
+>>>>>>> main
