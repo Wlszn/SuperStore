@@ -14,7 +14,8 @@ if (file_exists($envPath)) {
 }
 
 define('SUPABASE_URL', rtrim($_ENV['SUPABASE_URL'] ?? '', '/'));
-define('SUPABASE_KEY', $_ENV['SUPABASE_KEY'] ?? $_ENV['SUPABASE_SECRET_KEY'] ?? '');
+//define('SUPABASE_KEY', $_ENV['SUPABASE_KEY'] ?? $_ENV['SUPABASE_SECRET_KEY'] ?? '');
+define('SUPABASE_KEY', $_ENV['SUPABASE_SECRET_KEY'] ?? $_ENV['SUPABASE_KEY'] ?? '');
 
 if (SUPABASE_URL === '' || SUPABASE_KEY === '') {
     http_response_code(500);
@@ -35,7 +36,6 @@ function supa_request(string $method, string $path, ?array $query = null, ?array
 
     $headers = [
         'apikey: ' . SUPABASE_KEY,
-        'Authorization: Bearer ' . SUPABASE_KEY,
         'Content-Type: application/json',
     ];
 

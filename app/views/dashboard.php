@@ -77,10 +77,14 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
 
     <main class="fridge-grid">
         <?php
+        // $fridgePhotos = [
+        //     1 => 'https://www.nuvending.co.uk/wp-content/uploads/2024/08/Cantaloupe-Kiln-Farm-shoot-11-1.jpg',
+        //     2 => 'https://images.samsung.com/is/image/samsung/assets/us/explore/family-hub-refrigerator/overview/10232024/DA-FHMLP-FT02-ControlYourHome-MO.png?$720_N_PNG$',
+        // ];
         $fridgePhotos = [
-            1 => 'https://www.nuvending.co.uk/wp-content/uploads/2024/08/Cantaloupe-Kiln-Farm-shoot-11-1.jpg',
-            2 => 'https://images.samsung.com/is/image/samsung/assets/us/explore/family-hub-refrigerator/overview/10232024/DA-FHMLP-FT02-ControlYourHome-MO.png?$720_N_PNG$',
-        ];
+                1 => '/assets/img/fridge.jpg',
+                2 => '/assets/img/fridge2.jpg',
+            ];
         foreach ([1, 2] as $fridge): ?>
             <section class="fridge-card" id="fridge-card-<?= $fridge ?>" aria-labelledby="fridge-<?= $fridge ?>-title">
                 <img class="fridge-photo" src="<?= htmlspecialchars($fridgePhotos[$fridge], ENT_QUOTES) ?>" alt="Refrigerator <?= $fridge ?> storage area" onerror="this.onerror=null; this.src='https://commons.wikimedia.org/wiki/Special:FilePath/Refrigerator.jpg';">

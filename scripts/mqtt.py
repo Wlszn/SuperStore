@@ -1,72 +1,54 @@
-import time
-import paho.mqtt.client as mqtt
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <DHT.h>
 
-# --- Configuration ---
-SSID        = "REPLACE_WITH_YOUR_SSID"          # only used on a Pi if you script wifi
-PASSWORD    = "REPLACE_WITH_YOUR_PASSWORD"
-MQTT_SERVER = "YOUR_MQTT_BROKER_IP_ADDRESS"
-MQTT_PORT   = 1883
-CLIENT_ID   = "vanieriot"
+const char* WIFI_SSID = "";
+const char* WIFI_PASS = "";
+const char* MQTT_HOST = "10.0.0.93"; // the Pi's IP address
+const char* TOPIC = "Frig1"; // "Frig2" on the second board
 
-SUB_TOPIC   = "room/light"
-PUB_TOPIC   = "IoTlab/ESP32"
-PUB_PAYLOAD = "Hello I'm ESP32"
-PUB_INTERVAL = 5  # seconds
+#define DHT_PIN 4
+DHT dht(DHT_PIN, DHT11);
+WiFiClient wifi;
+PubSubClient mqtt(wifi);
 
-LED_PIN = 4       # only meaningful on a Pi / board with GPIO
-led_state = False # we track state in software if no GPIO
+void setup() {
+Serial.begin(115200);
+dht.begin();
+Serial.print("Connecting to wifi");
+WiFi.begin(WIFI_SSID, WIFI_PASS);
+while (WiFi.status() != WL_CONNECTED) {
+delay(500);
+Serial.print(".");
+}
+Serial.print("\nWifi connected, ESP32 IP: ");
+Serial.println(WiFi.localIP());
+mqtt.setServer(MQTT_HOST, 1883);
+}
 
+void loop() {
+if (!mqtt.connected()) {
+Serial.print("Connecting to the broker... ");
+if (mqtt.connect(TOPIC)) {
+Serial.println("connected");
+} else {
+Serial.print("failed, state=");
+Serial.println(mqtt.state());
+delay(2000);
+return;
+}
+}
 
-# --- Callbacks ---
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        print("Connected to broker")
-        client.subscribe(SUB_TOPIC)
-        print(f"Subscribed to {SUB_TOPIC}")
-    else:
-        print(f"Connect failed, rc={rc}")
-
-
-def on_message(client, userdata, msg):
-    global led_state
-    topic   = msg.topic
-    payload = msg.payload.decode()
-    print(f"Message arrived on topic: {topic}. Message: {payload}")
-
-    if topic == SUB_TOPIC:
-        if payload == "ON":
-            led_state = True
-            # On a Pi: GPIO.output(LED_PIN, GPIO.HIGH)
-            print("Light is ON")
-        else:
-            led_state = False
-            # On a Pi: GPIO.output(LED_PIN, GPIO.LOW)
-            print("Light is OFF")
-
-
-def on_disconnect(client, userdata, rc):
-    print(f"Disconnected (rc={rc}) — will retry automatically")
-
-
-# --- Setup ---
-client = mqtt.Client(client_id=CLIENT_ID)
-client.on_connect    = on_connect
-client.on_message    = on_message
-client.on_disconnect = on_disconnect
-
-print(f"Connecting to broker {MQTT_SERVER}:{MQTT_PORT} ...")
-client.connect(MQTT_SERVER, MQTT_PORT, keepalive=60)
-
-# Start the network loop in a background thread so we can publish in the main loop
-client.loop_start()
-
-# --- Main loop: publish every 5 seconds ---
-try:
-    while True:
-        client.publish(PUB_TOPIC, PUB_PAYLOAD)
-        print(f"Published '{PUB_PAYLOAD}' to {PUB_TOPIC}")
-        time.sleep(PUB_INTERVAL)
-except KeyboardInterrupt:
-    print("\nShutting down...")
-    client.loop_stop()
-    client.disconnect()
+float t = dht.readTemperature();
+float h = dht.readHumidity();
+if (isnan(t) || isnan(h)) {
+Serial.println("Sensor read failed (nan): check the wiring and DHT_PIN");
+} else {
+char msg[64];
+snprintf(msg, sizeof(msg), "{\"temp\": %.1f, \"hum\": %.1f}", t, h);
+mqtt.publish(TOPIC, msg);
+Serial.println(msg);
+}
+mqtt.loop();
+delay(5000);
+}
