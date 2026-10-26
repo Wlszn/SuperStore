@@ -4,7 +4,7 @@ import paho.mqtt.client as mqtt
 # --- Configuration ---
 SSID        = "REPLACE_WITH_YOUR_SSID"          # only used on a Pi if you script wifi
 PASSWORD    = "REPLACE_WITH_YOUR_PASSWORD"
-MQTT_SERVER = "YOUR_MQTT_BROKER_IP_ADDRESS"
+MQTT_SERVER = "127.0.0.1" 
 MQTT_PORT   = 1883
 CLIENT_ID   = "vanieriot"
 
