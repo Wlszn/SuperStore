@@ -40,8 +40,7 @@ class ThresholdController
         }
 
         $csrfToken = $this->csrfToken();
-
-        // $fridges and $csrfToken are visible inside the view.
+        
         require APP_ROOT . '/app/views/thresholds.php';
     }
 

@@ -9,7 +9,6 @@ use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
 
 
-// Project root = one level above public/
 define('APP_ROOT', dirname(__DIR__));
 
 spl_autoload_register(function (string $class): void {
@@ -18,9 +17,9 @@ spl_autoload_register(function (string $class): void {
         return;
     }
 
-    $parts = explode('\\', substr($class, strlen($prefix)));       // ['Models', 'Fridge']
-    $file = array_pop($parts);                                    // 'Fridge'
-    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : ''; // 'models/'
+    $parts = explode('\\', substr($class, strlen($prefix)));
+    $file = array_pop($parts);
+    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : ''; 
 
     $path = APP_ROOT . '/app/' . $dir . $file . '.php';
     if (is_file($path)) {
@@ -28,12 +27,8 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
-// Database / Supabase helper functions (supa_* ...)
 require APP_ROOT . '/config/db.php';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 function jsonResponse(int $status, array $body): void
 {
     http_response_code($status);
@@ -49,12 +44,10 @@ function view(string $name): void
 $routes = [
     'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? '/dashboard' : '/login')),
 
-    // Pages
     'GET /login' => fn() => view('login'),
     'GET /signup' => fn() => view('signup'),
     'GET /dashboard' => fn() => view('dashboard'),
 
-    // Actions
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],
     'GET /logout' => [AuthController::class, 'logout'],
