@@ -45,3 +45,35 @@ Insert Into customers (name, email, phone, address, created_at) Values
 ('Iulia Api', 'iuliaapi@gmail.com', '123-456-7890', '246 Boul Sam', NOW()),
 ('Sam Wil', 'samWil@gmail.com', '098-765-4321', '964 Sherb Ave', NOW()),
 ('Will', 'will102@yahoo.com', '555-555-5555', '876 St-Jean Rd', NOW());
+
+-- Phase 3: product management and inventory
+
+CREATE TABLE products (
+  id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  category    VARCHAR(50)  NOT NULL,
+  price       NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  upc         VARCHAR(13) UNIQUE,
+  epc         VARCHAR(24) UNIQUE,
+  producer    VARCHAR(100) NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (upc IS NOT NULL OR epc IS NOT NULL)
+);
+
+-- One product, many receptions (each delivery of stock).
+CREATE TABLE receptions (
+  id           INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id   INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  quantity     INT NOT NULL CHECK (quantity > 0),
+  received_at  DATE NOT NULL DEFAULT CURRENT_DATE
+);
+CREATE INDEX idx_receptions_product ON receptions (product_id);
+
+-- Stock is computed, never stored. Subtract sold quantities here once the checkout tables exist.
+CREATE VIEW product_stock WITH (security_invoker = true) AS
+SELECT p.*,
+       COALESCE((SELECT SUM(r.quantity) FROM receptions r WHERE r.product_id = p.id), 0)::INT AS in_stock
+FROM products p;
+
+ALTER TABLE products   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE receptions ENABLE ROW LEVEL SECURITY;
