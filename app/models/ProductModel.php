@@ -5,25 +5,23 @@ namespace App\Models;
 
 use App\Services\SupaClient;
 
-/**
- * Product model: the only place that talks to the `products` table
- * and the `product_stock` view (each product plus its computed in_stock).
- * Controllers call these methods and never build requests themselves.
- */
 class ProductModel
 {
     private const TABLE = 'products';
     private const STOCK_VIEW = 'product_stock';
-    private const COLUMNS = 'id,name,category,price,upc,epc,producer,in_stock';
+    private const COLUMNS = 'id,name,category,price,upc,epc,producer,image_url,in_stock';
 
     private const MAX_PRICE = 99999999.99; // NUMERIC(10,2)
+
+    /** At or below this quantity the dashboard flags the product as low stock. */
+    public const LOW_STOCK = 5;
 
     /** All products with their current stock, for the inventory dashboard. */
     public function all(): array
     {
         $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
             'select' => self::COLUMNS,
-            'order'  => 'name.asc',
+            'order' => 'name.asc',
         ]);
 
         return array_map([$this, 'normalize'], $rows);
@@ -34,8 +32,8 @@ class ProductModel
     {
         $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
             'select' => self::COLUMNS,
-            'id'     => 'eq.' . $id,
-            'limit'  => 1,
+            'id' => 'eq.' . $id,
+            'limit' => 1,
         ]);
 
         return $rows ? $this->normalize($rows[0]) : null;
@@ -54,8 +52,8 @@ class ProductModel
 
         $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
             'select' => self::COLUMNS,
-            'or'     => sprintf('(upc.eq.%1$s,epc.eq.%1$s)', $code),
-            'limit'  => 1,
+            'or' => sprintf('(upc.eq.%1$s,epc.eq.%1$s)', $code),
+            'limit' => 1,
         ]);
 
         return $rows ? $this->normalize($rows[0]) : null;
@@ -66,16 +64,10 @@ class ProductModel
     {
         $rows = SupaClient::rows('POST', self::TABLE, null, $data);
 
-        $product = $this->normalize($rows[0]);
-        $product['in_stock'] = 0; // a new product has no receptions yet
-
-        return $product;
+        // A new product has no receptions yet.
+        return $this->normalize($rows[0] + ['in_stock' => 0]);
     }
 
-    /**
-     * Update a product. $data must come from validate().
-     * Returns true if a product with that id existed and was updated.
-     */
     public function update(int $id, array $data): bool
     {
         // PATCH returns the updated rows; an empty list means no product had that id.
@@ -90,12 +82,6 @@ class ProductModel
         SupaClient::rows('DELETE', self::TABLE, ['id' => 'eq.' . $id]);
     }
 
-    /**
-     * Check and clean the form input.
-     * Returns [$data, $errors]: $data is ready for create()/update(),
-     * $errors is field => message (empty means valid).
-     * Pass $id when editing, so the product's own codes don't count as duplicates.
-     */
     public function validate(array $input, ?int $id = null): array
     {
         $errors = [];
@@ -143,6 +129,12 @@ class ProductModel
             $errors['producer'] = 'Producer cannot be longer than 100 characters.';
         }
 
+        // Optional picture for the dashboard and the checkout screen.
+        $imageUrl = trim((string) ($input['image_url'] ?? ''));
+        if ($imageUrl !== '' && (!preg_match('#^https?://#i', $imageUrl) || !filter_var($imageUrl, FILTER_VALIDATE_URL) || strlen($imageUrl) > 500)) {
+            $errors['image_url'] = 'The image must be a web address starting with http:// or https://.';
+        }
+
         // Only ask the database about duplicates once the format is right.
         if ($upc !== '' && !isset($errors['upc']) && $this->isTaken('upc', $upc, $id)) {
             $errors['upc'] = 'Another product already uses this UPC.';
@@ -152,12 +144,13 @@ class ProductModel
         }
 
         $data = [
-            'name'     => $name,
+            'name' => $name,
             'category' => $category,
-            'price'    => round((float) $rawPrice, 2),
-            'upc'      => $upc === '' ? null : $upc,
-            'epc'      => $epc === '' ? null : $epc,
+            'price' => round((float) $rawPrice, 2),
+            'upc' => $upc === '' ? null : $upc,
+            'epc' => $epc === '' ? null : $epc,
             'producer' => $producer,
+            'image_url' => $imageUrl === '' ? null : $imageUrl,
         ];
 
         return [$data, $errors];
@@ -168,8 +161,8 @@ class ProductModel
     {
         $query = [
             'select' => 'id',
-            $column  => 'eq.' . $value,
-            'limit'  => 1,
+            $column => 'eq.' . $value,
+            'limit' => 1,
         ];
         if ($exceptId !== null) {
             $query['id'] = 'neq.' . $exceptId;
@@ -185,6 +178,7 @@ class ProductModel
         $row['price'] = (float) $row['price'];
         if (isset($row['in_stock'])) {
             $row['in_stock'] = (int) $row['in_stock'];
+            $row['low_stock'] = $row['in_stock'] <= self::LOW_STOCK;
         }
 
         return $row;

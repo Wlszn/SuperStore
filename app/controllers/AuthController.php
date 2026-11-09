@@ -75,6 +75,7 @@ class AuthController
         session_regenerate_id(true);
         $_SESSION['customer_id'] = $customer->getId();
         $_SESSION['customer_name'] = $customer->getName();
+        $_SESSION['is_admin'] = false; // new accounts are always customers
 
         http_response_code(201);
         echo json_encode([
@@ -136,6 +137,7 @@ class AuthController
         session_regenerate_id(true);
         $_SESSION['customer_id'] = $customer->getId();
         $_SESSION['customer_name'] = $customer->getName();
+        $_SESSION['is_admin'] = $customer->isAdmin();
 
         echo json_encode([
             'status' => 'success',

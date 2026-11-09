@@ -13,8 +13,9 @@ class CustomerModel
     private string $address;
     private string $createdAt;
     private string $passwordHash;
+    private bool $isAdmin;
 
-    public function __construct(?int $id, string $name, string $email, string $phone, string $address, ?string $createdAt = null, string $passwordHash = '')
+    public function __construct(?int $id, string $name, string $email, string $phone, string $address, ?string $createdAt = null, string $passwordHash = '', bool $isAdmin = false)
     {
         $this->id = $id;
         $this->name = $name;
@@ -23,6 +24,7 @@ class CustomerModel
         $this->address = $address;
         $this->createdAt = $createdAt ?? date('Y-m-d H:i:s');
         $this->passwordHash = $passwordHash;
+        $this->isAdmin = $isAdmin;
     }
 
     public function getId(): ?int
@@ -78,6 +80,12 @@ class CustomerModel
     public function setCreatedAt(string $createdAt): void
     {
         $this->createdAt = $createdAt;
+    }
+
+    /** Admins can manage products. Set it in Supabase only, never from a form. */
+    public function isAdmin(): bool
+    {
+        return $this->isAdmin;
     }
 
     public function getPasswordHash(): string
@@ -219,7 +227,8 @@ class CustomerModel
             $data['phone'],
             $data['address'],
             $data['created_at'],
-            $data['password_hash'] ?? ''
+            $data['password_hash'] ?? '',
+            (bool) ($data['is_admin'] ?? false)
         );
     }
 
