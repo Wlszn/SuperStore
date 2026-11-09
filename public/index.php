@@ -3,13 +3,17 @@ declare(strict_types=1);
 
 session_start();
 
+// PHP defaults to UTC: without this, stock received in the evening is dated tomorrow.
+date_default_timezone_set('America/Toronto');
+
 use App\Controllers\AuthController;
 use App\Controllers\ThresholdController;
 use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
+use App\Controllers\ProductController;
+use App\Controllers\ScanApiController;
 
 
-// Project root = one level above public/
 define('APP_ROOT', dirname(__DIR__));
 
 spl_autoload_register(function (string $class): void {
@@ -18,9 +22,9 @@ spl_autoload_register(function (string $class): void {
         return;
     }
 
-    $parts = explode('\\', substr($class, strlen($prefix)));       // ['Models', 'Fridge']
-    $file = array_pop($parts);                                    // 'Fridge'
-    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : ''; // 'models/'
+    $parts = explode('\\', substr($class, strlen($prefix)));
+    $file = array_pop($parts);
+    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : ''; 
 
     $path = APP_ROOT . '/app/' . $dir . $file . '.php';
     if (is_file($path)) {
@@ -28,12 +32,8 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
-// Database / Supabase helper functions (supa_* ...)
 require APP_ROOT . '/config/db.php';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 function jsonResponse(int $status, array $body): void
 {
     http_response_code($status);
@@ -49,12 +49,10 @@ function view(string $name): void
 $routes = [
     'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? '/dashboard' : '/login')),
 
-    // Pages
     'GET /login' => fn() => view('login'),
     'GET /signup' => fn() => view('signup'),
     'GET /dashboard' => fn() => view('dashboard'),
 
-    // Actions
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],
     'GET /logout' => [AuthController::class, 'logout'],
@@ -68,6 +66,22 @@ $routes = [
 
     'GET /api/fan'     => [FanApiController::class, 'show'],
     'POST /api/fan'    => [FanApiController::class, 'update'],
+
+    // Phase 3: product management and inventory (admin only)
+    'GET /products'          => [ProductController::class, 'index'],
+    'GET /products/create'   => [ProductController::class, 'create'],
+    'GET /products/edit'     => [ProductController::class, 'edit'],
+    'GET /products/show'     => [ProductController::class, 'show'],
+    'GET /products/receive'  => [ProductController::class, 'receiveForm'],
+    'POST /products'         => [ProductController::class, 'store'],
+    'POST /products/update'  => [ProductController::class, 'update'],
+    'POST /products/delete'  => [ProductController::class, 'delete'],
+    'POST /receptions'       => [ProductController::class, 'receive'],
+
+    // Phase 3: scanners (used by management and self-checkout)
+    'GET /api/products/lookup' => [ProductController::class, 'lookup'],
+    'POST /api/scans'          => [ScanApiController::class, 'store'],
+    'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
 ];
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';

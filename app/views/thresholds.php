@@ -1,10 +1,5 @@
 <?php
-/**
- * Threshold settings page.
- * Variables from ThresholdController::index():
- *   array  $fridges    each: id, name, max_temp
- *   string $csrfToken
- */
+// Threshold settings page.
 ?>
 <!DOCTYPE html>
 <html lang="en">
