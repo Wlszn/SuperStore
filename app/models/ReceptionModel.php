@@ -6,10 +6,6 @@ namespace App\Models;
 use App\Services\SupaClient;
 use DateTimeImmutable;
 
-/**
- * Reception model: the only place that talks to the `receptions` table.
- * A reception is one delivery of a product (quantity + date received).
- */
 class ReceptionModel
 {
     private const TABLE = 'receptions';
@@ -21,9 +17,9 @@ class ReceptionModel
     public function forProduct(int $productId): array
     {
         $rows = SupaClient::rows('GET', self::TABLE, [
-            'select'     => self::COLUMNS,
+            'select' => self::COLUMNS,
             'product_id' => 'eq.' . $productId,
-            'order'      => 'received_at.desc,id.desc',
+            'order' => 'received_at.desc,id.desc',
         ]);
 
         return array_map([$this, 'normalize'], $rows);
@@ -37,11 +33,6 @@ class ReceptionModel
         return $this->normalize($rows[0]);
     }
 
-    /**
-     * Check and clean the "receive stock" form.
-     * Returns [$data, $errors] like ProductModel::validate().
-     * The date defaults to today and can't be in the future.
-     */
     public function validate(array $input): array
     {
         $errors = [];
@@ -60,7 +51,6 @@ class ReceptionModel
         $rawDate = trim((string) ($input['received_at'] ?? ''));
         $date = $rawDate === '' ? $today : DateTimeImmutable::createFromFormat('!Y-m-d', $rawDate);
 
-        // createFromFormat accepts 2026-02-31 and rolls it over, so compare it back.
         if ($date === false || $date->format('Y-m-d') !== ($rawDate === '' ? $today->format('Y-m-d') : $rawDate)) {
             $errors['received_at'] = 'Please enter a valid date.';
         } elseif ($date > $today) {
@@ -68,15 +58,14 @@ class ReceptionModel
         }
 
         $data = [
-            'product_id'  => (int) $productId,
-            'quantity'    => (int) $quantity,
+            'product_id' => (int) $productId,
+            'quantity' => (int) $quantity,
             'received_at' => $date ? $date->format('Y-m-d') : null,
         ];
 
         return [$data, $errors];
     }
 
-    /** Make sure every value has a predictable PHP type. */
     private function normalize(array $row): array
     {
         $row['id'] = (int) $row['id'];
