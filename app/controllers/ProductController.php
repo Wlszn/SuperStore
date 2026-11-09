@@ -376,6 +376,15 @@ class ProductController
         ]);
     }
 
+    public function getProductByBarcode(string $barcode): ?array
+    {
+        try {
+            return $this->products->findByCode($barcode);
+        } catch (RuntimeException $e) {
+            return null;
+        }
+    }
+
     private function serverError(): void
     {
         jsonResponse(500, ['status' => 'error', 'message' => 'Something went wrong on our side. Please try again.']);
