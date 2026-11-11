@@ -129,9 +129,10 @@ class ThresholdController
         ]);
     }
 
+    /** Thresholds are store settings: staff (admins) only, since customers can sign in too. */
     private function isLoggedIn(): bool
     {
-        return isset($_SESSION['customer_id']);
+        return isset($_SESSION['customer_id']) && !empty($_SESSION['is_admin']);
     }
 
     /** One random token per session; the page sends it back with every save. */

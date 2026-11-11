@@ -138,3 +138,125 @@ INSERT INTO receptions (product_id, quantity, received_at) VALUES
 
 -- Make your own account an admin (change the email):
 -- UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
+
+-- =====================================================================
+-- Phase 3b: self-checkout
+-- Safe to run after the Phase 3 section (it only adds things and can be
+-- run twice).
+-- =====================================================================
+
+-- customers.created_at was TIMESTAMP (no timezone) in Phase 1. Its values
+-- were written by Supabase's NOW(), which runs in UTC.
+DO $$
+BEGIN
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'customers' AND column_name = 'created_at')
+     = 'timestamp without time zone' THEN
+    ALTER TABLE customers ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+  END IF;
+END $$;
+ALTER TABLE customers ALTER COLUMN created_at SET DEFAULT now();
+
+-- How the customer paid (simulated).
+ALTER TABLE purchases
+  ADD COLUMN IF NOT EXISTS payment_method VARCHAR(10) NOT NULL DEFAULT 'card'
+                           CHECK (payment_method IN ('card', 'cash'));
+
+-- Valid check digit for the demo Coca-Cola barcode.
+UPDATE products SET upc = '0067000004117' WHERE upc = '0067000004114';
+
+-- One checkout, all or nothing: checks stock, saves the purchase and its
+-- items, and adds the points. Called by PurchaseModel through
+-- POST /rest/v1/rpc/checkout. Business problems (empty cart, not enough
+-- stock...) come back as {"ok": false, "error": ...} instead of an exception,
+-- so the page can show a clear message.
+--   p_items: [{"product_id": 1, "quantity": 2}, ...]
+--   Points strategy: members earn 1 point per whole dollar spent.
+CREATE OR REPLACE FUNCTION checkout(p_customer_id INT, p_items JSONB, p_payment_method TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_line        RECORD;
+  v_total       NUMERIC(10,2) := 0;
+  v_points      INT := 0;
+  v_purchase_id INT;
+BEGIN
+  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'empty_cart');
+  END IF;
+
+  IF p_payment_method IS NULL OR p_payment_method NOT IN ('card', 'cash') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'invalid_payment');
+  END IF;
+
+  IF p_customer_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM customers WHERE id = p_customer_id) THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'unknown_customer');
+  END IF;
+
+  -- The same product sent twice counts as one line.
+  DROP TABLE IF EXISTS checkout_lines;
+  CREATE TEMP TABLE checkout_lines ON COMMIT DROP AS
+    SELECT (e->>'product_id')::INT AS product_id, SUM((e->>'quantity')::INT)::INT AS quantity
+    FROM jsonb_array_elements(p_items) AS e
+    GROUP BY 1;
+
+  -- Lock the products being sold, so two checkouts can't sell the last unit twice.
+  PERFORM 1 FROM products
+  WHERE id IN (SELECT product_id FROM checkout_lines)
+  ORDER BY id
+  FOR UPDATE;
+
+  FOR v_line IN
+    SELECT l.product_id, l.quantity, p.id AS found, p.name, p.price, s.in_stock
+    FROM checkout_lines l
+    LEFT JOIN products p      ON p.id = l.product_id
+    LEFT JOIN product_stock s ON s.id = l.product_id
+  LOOP
+    IF v_line.found IS NULL THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'unknown_product', 'product_id', v_line.product_id);
+    END IF;
+    IF v_line.quantity < 1 OR v_line.quantity > 99 THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'invalid_quantity', 'product', v_line.name);
+    END IF;
+    IF v_line.quantity > v_line.in_stock THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'out_of_stock',
+                                'product', v_line.name, 'in_stock', GREATEST(v_line.in_stock, 0));
+    END IF;
+    v_total := v_total + v_line.price * v_line.quantity;
+  END LOOP;
+
+  IF p_customer_id IS NOT NULL THEN
+    v_points := FLOOR(v_total)::INT;
+  END IF;
+
+  INSERT INTO purchases (customer_id, total, points_earned, payment_method)
+  VALUES (p_customer_id, v_total, v_points, p_payment_method)
+  RETURNING id INTO v_purchase_id;
+
+  -- Name and price are copied, so the receipt never changes afterwards.
+  INSERT INTO purchase_items (purchase_id, product_id, name, unit_price, quantity)
+  SELECT v_purchase_id, p.id, p.name, p.price, l.quantity
+  FROM checkout_lines l
+  JOIN products p ON p.id = l.product_id
+  ORDER BY p.name;
+
+  IF p_customer_id IS NOT NULL THEN
+    UPDATE customers SET points = points + v_points WHERE id = p_customer_id;
+  END IF;
+
+  RETURN jsonb_build_object('ok', true, 'purchase_id', v_purchase_id,
+                            'total', v_total, 'points_earned', v_points);
+END;
+$$;
+
+-- Only the server (secret key) may run a checkout, never the public key.
+REVOKE ALL ON FUNCTION checkout(INT, JSONB, TEXT) FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION checkout(INT, JSONB, TEXT) FROM anon, authenticated;
+    GRANT EXECUTE ON FUNCTION checkout(INT, JSONB, TEXT) TO service_role;
+  END IF;
+END $$;

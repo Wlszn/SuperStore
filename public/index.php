@@ -12,6 +12,9 @@ use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
 use App\Controllers\ProductController;
 use App\Controllers\ScanApiController;
+use App\Controllers\CheckoutController;
+use App\Controllers\AccountController;
+use App\Services\Lang;
 
 
 define('APP_ROOT', dirname(__DIR__));
@@ -46,8 +49,24 @@ function view(string $name): void
     require APP_ROOT . '/app/views/' . $name . '.php';
 }
 
+/** Translated text (English/French), see app/lang/. */
+function t(string $key, array $vars = []): string
+{
+    return Lang::t($key, $vars);
+}
+
+/** Where a signed-in user lands: admins on the store dashboard, customers on their account. */
+function homePath(): string
+{
+    if (!isset($_SESSION['customer_id'])) {
+        return '/login';
+    }
+
+    return empty($_SESSION['is_admin']) ? '/account' : '/dashboard';
+}
+
 $routes = [
-    'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? '/dashboard' : '/login')),
+    'GET /' => fn() => header('Location: ' . homePath()),
 
     'GET /login' => fn() => view('login'),
     'GET /signup' => fn() => view('signup'),
@@ -82,6 +101,21 @@ $routes = [
     'GET /api/products/lookup' => [ProductController::class, 'lookup'],
     'POST /api/scans'          => [ScanApiController::class, 'store'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
+
+    // Phase 3: self-checkout kiosk and customer accounts
+    'GET /checkout'            => [CheckoutController::class, 'index'],
+    'POST /checkout'           => [CheckoutController::class, 'pay'],
+    'GET /api/members/lookup'  => [CheckoutController::class, 'member'],
+    'GET /account'             => [AccountController::class, 'index'],
+    'GET /receipts/show'       => [AccountController::class, 'receipt'],
+
+    // English / French (bonus): /lang?to=fr&back=/checkout
+    'GET /lang' => function (): void {
+        Lang::set((string) ($_GET['to'] ?? 'en'));
+        $back = (string) ($_GET['back'] ?? '/');
+        // Only paths on this site, never another website.
+        header('Location: ' . (preg_match('#^/(?![/\\\\])[A-Za-z0-9/_?=&.%-]*$#', $back) ? $back : '/'));
+    },
 ];
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';

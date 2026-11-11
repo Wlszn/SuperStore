@@ -80,8 +80,8 @@ class AuthController
         http_response_code(201);
         echo json_encode([
             'status' => 'success',
-            'message' => 'Your account was created. Taking you to your dashboard...',
-            'redirect' => '/dashboard',
+            'message' => 'Your account was created. Taking you to your account...',
+            'redirect' => homePath(),
         ]);
     }
 
@@ -142,7 +142,7 @@ class AuthController
         echo json_encode([
             'status' => 'success',
             'message' => 'Welcome back, ' . $customer->getName() . '! Signing you in...',
-            'redirect' => '/dashboard',
+            'redirect' => homePath(), // admins: store dashboard, customers: their account
         ]);
     }
 

@@ -50,6 +50,11 @@ class ProductModel
             return null;
         }
 
+        // A 12-digit UPC-A is stored as its 13-digit EAN form (see normalizeUpc).
+        if (ctype_digit($code)) {
+            $code = self::normalizeUpc($code);
+        }
+
         $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
             'select' => self::COLUMNS,
             'or' => sprintf('(upc.eq.%1$s,epc.eq.%1$s)', $code),
@@ -117,6 +122,11 @@ class ProductModel
         }
         if ($upc !== '' && !preg_match('/^\d{8,13}$/', $upc)) {
             $errors['upc'] = 'The UPC must be 8 to 13 digits.';
+        } elseif ($upc !== '') {
+            $upc = self::normalizeUpc($upc);
+            if (strlen($upc) === 13 && !self::hasValidCheckDigit($upc)) {
+                $errors['upc'] = 'This barcode is not valid (wrong last digit). Scan it again or check for a typo.';
+            }
         }
         if ($epc !== '' && !preg_match('/^[0-9A-F]{1,24}$/', $epc)) {
             $errors['epc'] = 'The EPC must be up to 24 hexadecimal characters (0-9, A-F).';
@@ -169,6 +179,27 @@ class ProductModel
         }
 
         return SupaClient::rows('GET', self::TABLE, $query) !== [];
+    }
+
+    /**
+     * Scanners read the same barcode as 12 digits (UPC-A) or 13 (EAN-13 with a
+     * leading 0), depending on their settings. Storing every UPC-A as 13 digits
+     * means both readings find the same product.
+     */
+    private static function normalizeUpc(string $upc): string
+    {
+        return strlen($upc) === 12 ? '0' . $upc : $upc;
+    }
+
+    /** EAN-13 check digit: weights 1,3,1,3... on the first 12 digits. */
+    private static function hasValidCheckDigit(string $ean13): bool
+    {
+        $sum = 0;
+        for ($i = 0; $i < 12; $i++) {
+            $sum += (int) $ean13[$i] * ($i % 2 === 0 ? 1 : 3);
+        }
+
+        return (10 - $sum % 10) % 10 === (int) $ean13[12];
     }
 
     /** Make sure every value has a predictable PHP type. */
