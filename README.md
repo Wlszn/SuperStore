@@ -10,7 +10,7 @@ SuperStore simulates a physical store where sensors, actuators and single-board 
 |---|---|---|
 | **Phase 1** | Customer registration with LED/buzzer feedback | Done |
 | **Phase 2** | IoT dashboard: fridge sensors over MQTT, thresholds, email alerts, fan control | Done |
-| **Phase 3** | Product management, inventory, barcode/RFID, self-checkout, loyalty points | In progress |
+| **Phase 3** | Product management, inventory, barcode/RFID, self-checkout, loyalty points | Done |
 
 The store has two sides:
 
@@ -56,14 +56,21 @@ SuperStore/
 │   │   ├── ReadingApiController.php  # sensor readings in, dashboard data out (Phase 2)
 │   │   ├── FanApiController.php      # fan on/off state (Phase 2)
 │   │   ├── ProductController.php     # products, inventory, receive stock (Phase 3)
-│   │   └── ScanApiController.php     # RFID scans (Phase 3)
+│   │   ├── ScanApiController.php     # RFID scans (Phase 3)
+│   │   ├── CheckoutController.php    # self-checkout kiosk, payment, receipt email (Phase 3)
+│   │   └── AccountController.php     # customer account: card, points, history, receipts (Phase 3)
 │   ├── models/
 │   │   ├── CustomerModel.php
 │   │   ├── Fridge.php  Reading.php  FanState.php  Alert.php
-│   │   └── ProductModel.php  ReceptionModel.php  ScanModel.php
+│   │   └── ProductModel.php  ReceptionModel.php  ScanModel.php  PurchaseModel.php
 │   ├── services/
-│   │   └── SupaClient.php            # throws on a failed Supabase request
-│   └── views/                        # login, signup, dashboard, thresholds, products/*
+│   │   ├── SupaClient.php            # throws on a failed Supabase request
+│   │   ├── ReceiptMailer.php         # runs scripts/send_receipt.py
+│   │   ├── Barcode.php               # membership card barcode (Code 128, SVG)
+│   │   └── Lang.php                  # English / French
+│   ├── lang/                         # en.php, fr.php: every customer-facing text
+│   └── views/                        # login, signup, dashboard, thresholds, products/*,
+│                                     # checkout, account, receipt, partials/ (header, footer)
 ├── config/
 │   ├── db.php                        # reads .env, supa_request() REST helper
 │   └── db.sql                        # full schema, one section per phase
@@ -73,12 +80,14 @@ SuperStore/
 │   └── SuperStore-ERD.png            # ER diagram image
 ├── public/
 │   ├── index.php                     # front controller + every route
-│   └── assets/                       # css, js (form-utils.js), images
+│   └── assets/                       # css, js (form-utils.js, app.js, checkout.js), images
 ├── scripts/
 │   ├── gpio_signal.py                # blue/red LED (Phase 1)
 │   ├── monitor.py                    # MQTT -> API, alert email, YES reply (Phase 2)
 │   ├── fan.py                        # drives the DC motor from the fan state (Phase 2)
-│   └── mqtt.py                       # ESP32 sketch (Arduino C++, flashed to the boards)
+│   ├── mqtt.py                       # ESP32 sketch (Arduino C++, flashed to the boards)
+│   ├── rfid.py                       # RFID reader -> POST /api/scans (Phase 3)
+│   └── send_receipt.py               # emails a checkout receipt (Phase 3)
 ├── .env.example
 └── README.md
 ```
@@ -103,7 +112,7 @@ Copy `.env.example` to `.env` and fill it in:
 
 ### 2. Database
 
-In the Supabase SQL Editor, run the sections of `config/db.sql` that the database doesn't have yet (each phase has its own section). Then make your account an admin:
+In the Supabase SQL Editor, run the sections of `config/db.sql` that the database doesn't have yet (each phase has its own section; **Phase 3b** is safe to run twice). Then make your account an admin:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -112,7 +121,7 @@ UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
 ### 3. Raspberry Pi
 
 ```bash
-sudo apt install php-cli php-curl mosquitto python3-gpiozero python3-paho-mqtt python3-dotenv
+sudo apt install php-cli php-curl mosquitto python3-gpiozero python3-paho-mqtt python3-dotenv python3-serial
 php -S 0.0.0.0:8000 -t public        # the scripts expect the app on port 8000
 ```
 
@@ -128,6 +137,7 @@ Each script runs in its own terminal:
 ```bash
 python3 scripts/monitor.py   # fridge readings + email alerts
 python3 scripts/fan.py       # fan motor
+python3 scripts/rfid.py      # RFID reader (Phase 3)
 ```
 
 ### 4. ESP32 boards
@@ -191,12 +201,22 @@ Thresholds are stored per fridge in the database and edited on the **Thresholds*
 - UPC read by the barcode scanner, EPC read by the RFID reader.
 - A notification after every action (add, edit, delete, receive stock).
 
-**Self-checkout (customers):**
+**Self-checkout (`/checkout`, no login needed):**
 
-- Scan every product at once with the RFID reader; the list and total update live.
-- Remove items, enter a membership card, simulate payment.
-- Earn loyalty points; a receipt is emailed to the customer's registered address.
-- Customers see their points and purchase history (past receipts).
+1. The customer puts every product on the RFID reader: all tags are read at once and appear in the list. The barcode scanner adds items one at a time.
+2. The list and total update live. Quantities can be changed and items removed.
+3. **Checkout** asks for the membership card: scan the barcode on the card (shown in *My account*), type the number, or continue as a guest.
+4. The customer confirms the list, then pays: card (simulated tap) or cash (change calculated).
+5. The `checkout()` database function saves the purchase and its items, checks the stock and adds the points in **one transaction**. If the stock changed in the meantime, nothing is saved and the kiosk says which item is short.
+6. The receipt (items, quantities, prices, total, points, date and time) is shown and **emailed** to members. The kiosk resets after 60 s. The blue LED lights for a completed checkout, the red one for a refused one.
+
+**Points strategy:** members earn **1 point per whole dollar** spent (a $9.77 purchase earns 9 points). Guests earn none.
+
+**Customer account (`/account`):** name, email, membership card with its barcode, points balance and purchase history; each past receipt can be opened and printed.
+
+**Bilingual (bonus):** the **FR / EN** link in the header switches the checkout, account and receipt pages (and the receipt email) between English and French.
+
+**Roles:** admins land on the store dashboard and manage products; customers land on their account. Customers can't open the management pages or the fridge thresholds.
 
 **Database:** see [`docs/ER.md`](docs/ER.md) for the ER diagram and the relations between products, customers and purchases. Stock is not stored. It is computed by the `product_stock` view as *everything received − everything sold*.
 
@@ -244,15 +264,45 @@ Error slots in the form: `<span class="field-error" id="error-upc"></span>` (one
 | `GET /api/scans/latest` | The newest scan. Remember its `last_id`. |
 | `GET /api/scans/latest?after=12` | Every scan newer than 12, oldest first, plus the new `last_id`. Poll every second. |
 
-- **Barcode scanner:** it types like a keyboard, so it fills the focused UPC field with no code needed.
+- **Barcode scanner:** it types like a keyboard, so it fills the focused UPC field with no code needed. The forms catch its Enter key so it never submits by accident. A 12-digit UPC-A is stored as 13 digits (leading `0`), so scanners set to either format find the same product; the check digit is verified.
 - **RFID on the product form:** poll `/api/scans/latest?after=<last_id>` and put the newest `epc` into the EPC field.
+
+### Self-checkout routes
+
+| Route | Use |
+|---|---|
+| `GET /checkout` | The kiosk page |
+| `GET /api/members/lookup?number=SS100001` | The member behind a membership card (first name and points only) |
+| `POST /checkout` | JSON `{"items":[{"product_id":1,"quantity":2}], "membership_number":"SS100001", "payment_method":"card", "csrf_token":"..."}` |
+| `GET /account` | Customer account |
+| `GET /receipts/show?id=12` | One receipt (its owner, an admin, or the kiosk that just completed it) |
+| `GET /lang?to=fr&back=/checkout` | Switch language |
 
 ### RFID reader setup (Raspberry Pi)
 
 1. Switch the CF600 to **CDC-COM** mode with Chafon's configuration tool (Windows, from the SDK).
 2. `sudo modprobe usbserial vendor=0x0483 product=0x5750`
-3. `ls /dev/ttyUSB*` should list the reader.
+3. `ls /dev/ttyUSB* /dev/ttyACM*` should list the reader.
 4. Add yourself to the serial group once: `sudo usermod -aG dialout $USER`, then log out and back in.
+5. `python3 scripts/rfid.py`. It finds the port and baud rate, asks the reader which Chafon protocol it speaks, then reads all the tags on it several times per second. Each tag is sent once when it arrives, and again only after it was taken off the reader.
+
+| Command | When |
+|---|---|
+| `python3 scripts/rfid.py --port /dev/ttyACM0` | The reader has another name |
+| `python3 scripts/rfid.py --raw` | Nothing is read: shows every byte exchanged with the reader |
+| `python3 scripts/rfid.py --send E280...` | Test the website without the reader |
+
+**Plan B:** if the serial mode doesn't work, put the reader in **keyboard** mode. It then types the tag into the focused scan box like the barcode scanner, and the checkout accepts it (one tag at a time).
+
+### Testing in class (checklist)
+
+1. Pi: `git pull`, `php -S 0.0.0.0:8000 -t public`, then `python3 scripts/rfid.py` in a second terminal.
+2. Sign in as an admin → **Products** → **+ Add product**: click the UPC field and scan the barcode (the cursor jumps to EPC), click **Read tag** and put the tag on the reader, fill the rest, **Add product**.
+3. **Receive stock**: scan the product (barcode or tag), enter a quantity → "Received … In stock: …".
+4. Sign up as a customer (another browser or a private window) → **My account** shows the membership card.
+5. Open **Self-checkout**, put several tagged products on the reader at once → they all appear. Scan a barcode → one more item. Remove one.
+6. **Checkout** → scan the membership card barcode from the account page (on a phone screen or printed) → confirm → **Card** → the receipt appears and the email arrives.
+7. **My account** → the points and the receipt are there. Switch **FR** to show the bonus.
 
 **Hardware:** Chafon CF600 UHF RFID reader + tags, USB barcode scanner, Raspberry Pi 5.
 
