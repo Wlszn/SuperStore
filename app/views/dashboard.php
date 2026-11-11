@@ -5,6 +5,12 @@ if (!isset($_SESSION['customer_id'])) {
     exit;
 }
 
+// The store dashboard is for staff; customers have their own account page.
+if (empty($_SESSION['is_admin'])) {
+    header('Location: /account');
+    exit;
+}
+
 $customerName = $_SESSION['customer_name'] ?? 'there';
 ?>
 <!DOCTYPE html>
@@ -67,7 +73,10 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
             <p>Welcome, <?= htmlspecialchars($customerName, ENT_QUOTES) ?>. Live refrigerator status.</p>
         </div>
         <nav class="dashboard-nav" aria-label="Dashboard navigation">
+            <a href="/products">Products</a>
+            <a href="/products/receive">Receive stock</a>
             <a href="/thresholds">Thresholds</a>
+            <a href="/checkout">Self-checkout</a>
             <a href="/logout">Sign out</a>
         </nav>
     </header>

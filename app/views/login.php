@@ -1,7 +1,7 @@
 <?php
 
 if (isset($_SESSION['customer_id'])) {
-    header('Location: /dashboard');
+    header('Location: ' . homePath());
     exit;
 }
 ?>
