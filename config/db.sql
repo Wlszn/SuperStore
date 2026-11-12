@@ -90,7 +90,8 @@ CREATE TABLE purchases (
 );
 CREATE INDEX idx_purchases_customer ON purchases (customer_id, purchased_at);
 
--- The lines of a receipt. Name and price are copied at checkout time so
+
+  -- The lines of a receipt. Name and price are copied at checkout time so
 -- old receipts stay correct after a product is edited or deleted.
 CREATE TABLE purchase_items (
   id           INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

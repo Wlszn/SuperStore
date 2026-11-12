@@ -59,6 +59,7 @@ class ProductModel
         return $rows ? $this->normalize($rows[0]) : null;
     }
 
+
     /** Insert a product. $data must come from validate(). Returns the new row. */
     public function create(array $data): array
     {
@@ -80,6 +81,11 @@ class ProductModel
     public function delete(int $id): void
     {
         SupaClient::rows('DELETE', self::TABLE, ['id' => 'eq.' . $id]);
+    }
+
+    public function pointsCalculate(float $price): int 
+    {
+        return (int)$price * 10;
     }
 
     public function validate(array $input, ?int $id = null): array
