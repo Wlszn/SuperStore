@@ -10,6 +10,7 @@ class CustomerController
 {
 
     private const GPIO_SCRIPT = __DIR__ . '/../scripts/gpio_signal.py';
+//    $Membership["valid"];
 
     public function addCustomer(): void
     {
@@ -56,11 +57,20 @@ class CustomerController
         
     }
 
-    public function pointsEarned() : void
+    public function pointsEarned(): void
     {
-        header('content Type: application/json');
-        
-        //give a 10 points for every dollar 
+        header('Content Type: application/json');
+
+        //find the customer id for purchases
+        //calculate the amount in points calculate method
+        //and then add it to the current points that the customer has
+        // if($Membership['valid']==true)
+        //     {
+                
+        //     }
+
+        //     exit;
+
     }
 
     private function triggerGPIO(string $result): void
@@ -69,8 +79,4 @@ class CustomerController
         $resultArg = escapeshellarg($result);
         shell_exec("python3 {$script} {$resultArg} > /dev/null 2>&1 &");
     }
-
-    
-
-
 }
