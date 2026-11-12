@@ -251,6 +251,13 @@ class ProductController
         ]);
     }
 
+    public function pointsCalculate(float $price): int
+    {
+        //for every dollar they get 10 points out of it
+    
+        return (int)$price * 10;
+    }
+
     /** GET /api/products/lookup?code=...: the product behind a scanned UPC or EPC. */
     public function lookup(): void
     {
@@ -338,6 +345,7 @@ class ProductController
 
         return $id === false ? null : $id;
     }
+
 
     /**
      * Show a view with $data as variables (plus $csrfToken).

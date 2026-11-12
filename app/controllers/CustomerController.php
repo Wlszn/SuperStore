@@ -56,10 +56,21 @@ class CustomerController
         
     }
 
+    public function pointsEarned() : void
+    {
+        header('content Type: application/json');
+        
+        //give a 10 points for every dollar 
+    }
+
     private function triggerGPIO(string $result): void
     {
         $script = escapeshellarg(self::GPIO_SCRIPT);
         $resultArg = escapeshellarg($result);
         shell_exec("python3 {$script} {$resultArg} > /dev/null 2>&1 &");
     }
+
+    
+
+
 }
