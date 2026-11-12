@@ -54,7 +54,7 @@ ALTER TABLE customers
   ADD COLUMN is_admin           BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN membership_number  VARCHAR(10) NOT NULL UNIQUE
                                 DEFAULT ('SS' || nextval('membership_number_seq')),
-  ADD COLUMN points             INT NOT NULL DEFAULT 0 CHECK (points >= 0);
+  ADD COLUMN points           INT NOT NULL DEFAULT 0 CHECK (points >= 0);
 
 -- Each product is defined once...
 CREATE TABLE products (
