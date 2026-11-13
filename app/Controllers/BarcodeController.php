@@ -1,16 +1,19 @@
 <?php
 declare(strict_types=1);
 
+
 namespace App\Controllers;
+session_start();
 
 use App\Models\ProductModel;
-use App\Support\Cart;
+use App\Services\Cart;
 use RuntimeException;
 
 class BarcodeController
 {
     private ProductModel $products;
     private Cart $cart;
+   
 
     public function __construct()
     {
@@ -26,6 +29,7 @@ class BarcodeController
     public function processBarcode(): void
     {
         // 1. Read input
+       
         $raw     = file_get_contents('php://input');
         $input   = $raw !== '' ? json_decode($raw, true) : null;
         $barcode = trim((string)($_POST['barcode'] ?? $input['barcode'] ?? ''));
@@ -79,6 +83,8 @@ class BarcodeController
                 'total' => $this->cart->total(),
             ],
         ]);
+
+        header("Refresh: 2");
     }
 
     private function detectCodeType(string $code): ?string

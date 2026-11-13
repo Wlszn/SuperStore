@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+namespace config;
 
 $envPath = __DIR__ . '/../.env';
 if (file_exists($envPath)) {
