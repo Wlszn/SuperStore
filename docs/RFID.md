@@ -12,9 +12,15 @@ On a Raspberry Pi, copy the SDK folder onto the Pi and pass its location:
 
 The bridge selects the SDK library for the operating system and CPU. Linux USB access depends on device permissions. Use --list to check detection. Use --read-only --seconds 10 to read tags without sending them to the app.
 
+For a reader configured in serial (CDC-COM) mode, use the serial bridge instead:
+
+    python3 scripts/RFID_Scanner.py --port /dev/ttyUSB0 --url http://127.0.0.1:8000
+
+On Windows replace the port with the reader's COM port and use `python`. If SuperStore runs on a different machine, pass its base URL. Restart the reader script after updating it. When using the SDK bridge, omit `--read-only` for checkout.
+
 For registration, open Add product, focus Barcode and scan the card. Select Read EPC from reader and present one RFID tag. Save the product, then receive stock.
 
-For checkout, select Start RFID reader before placing products on the reader. Each EPC is counted once per basket. The bridge forwards batches of up to 100 tags.
+For checkout, select Start RFID reader before placing products on the reader. Matching products are added automatically, and the scan field shows the latest EPC when it is clear. Each EPC is counted once per basket. The bridge forwards batches of up to 100 tags.
 
 The application assigns the existing EPC to a product record. It does not rewrite RFID tag memory.
 

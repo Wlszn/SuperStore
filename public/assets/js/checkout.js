@@ -32,6 +32,8 @@
     const seenTags = new Set();
     const reader = document.getElementById('reader');
     const readerStatus = document.getElementById('reader-status');
+    const scanInput = document.getElementById('code');
+    let lastAutoAddedEpc;
 
     async function pollReader(session) {
         let changed = false;
@@ -63,6 +65,11 @@
                         const quantity = (cart.get(product.id)?.quantity || 0) + 1;
                         if (quantity <= Math.min(product.in_stock, 1000)) {
                             cart.set(product.id, {...product, quantity});
+                            if (!scanInput.value || scanInput.value === lastAutoAddedEpc) {
+                                scanInput.value = scan.epc;
+                                lastAutoAddedEpc = scan.epc;
+                                if (document.activeElement === scanInput) scanInput.select();
+                            }
                             changed = true;
                         } else {
                             message('Not enough stock for ' + product.name, true);
@@ -179,7 +186,15 @@
             remove.className = 'button';
             window.setLocalizedText(remove, "Remove");
             remove.disabled = busy;
-            remove.onclick = () => { cart.delete(product.id); render(); message('Item removed.'); };
+            remove.onclick = () => {
+                cart.delete(product.id);
+                if (lastAutoAddedEpc && product.epc === lastAutoAddedEpc) {
+                    if (scanInput.value === lastAutoAddedEpc) scanInput.value = '';
+                    lastAutoAddedEpc = undefined;
+                }
+                render();
+                message('Item removed.');
+            };
             cell.append(remove);
             row.append(cell);
             basket.append(row);
@@ -190,8 +205,9 @@
         reader.disabled = busy;
     }
     const picker = document.getElementById('checkout-product');
-    const scanInput = document.getElementById('code');
+    scanInput.addEventListener('input', () => { lastAutoAddedEpc = undefined; });
     picker?.addEventListener('change', () => {
+        lastAutoAddedEpc = undefined;
         scanInput.value = picker.value;
         scanInput.focus();
         scanInput.select();
@@ -201,22 +217,27 @@
     document.getElementById('scan').onsubmit = async event => {
         event.preventDefault();
         if (busy) return;
+        const code = scanInput.value.trim();
+        if (code === lastAutoAddedEpc) {
+            message('This RFID tag is already in your basket.');
+            scanInput.select();
+            return;
+        }
         busy = true;
         render();
-        const input = document.getElementById('code');
         try {
-            const response = await fetch('/api/products/lookup?code=' + encodeURIComponent(input.value.trim()));
+            const response = await fetch('/api/products/lookup?code=' + encodeURIComponent(code));
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             const product = result.product;
             const quantity = (cart.get(product.id)?.quantity || 0) + 1;
             if (quantity > Math.min(product.in_stock, 1000)) throw new Error('No more stock available for this product.');
             cart.set(product.id, { ...product, quantity });
-            input.value = '';
+            scanInput.value = '';
             if (picker) picker.value = '';
             message('Item added.');
         } catch (error) { message(error.message || 'Scanner lookup unavailable. Please retry.', true); }
-        finally { busy = false; render(); input.focus(); }
+        finally { busy = false; render(); scanInput.focus(); }
     };
     let previousPointsError;
     function pointsError() {

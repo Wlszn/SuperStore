@@ -413,6 +413,7 @@
     "Sample delivery filled in.": "Les d\u00e9tails de la livraison exemple ont \u00e9t\u00e9 remplis.",
     "Order placed successfully.": "Commande pass\u00e9e avec succ\u00e8s.",
     "Product selected. Add it to your basket.": "Produit s\u00e9lectionn\u00e9. Ajoutez-le \u00e0 votre panier.",
+    "This RFID tag is already in your basket.": "Cette \u00e9tiquette RFID a d\u00e9j\u00e0 \u00e9t\u00e9 ajout\u00e9e au panier.",
     "RFID reader started.": "Lecture RFID activ\u00e9e.",
     "RFID items added to your basket.": "Articles RFID ajout\u00e9s au panier.",
     "{0} \u00b7 Total {1}": "{0} \u00b7 Total {1}",
