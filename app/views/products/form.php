@@ -50,11 +50,15 @@ require __DIR__ . '/_start.php';
                 <input id="product-upc" name="upc" class="code" inputmode="text" autocomplete="off" value="<?= $e($editing ? ($product['upc'] ?? '') : $prefill) ?>" data-upc-entry>
                 <span data-error="upc" class="field-error"></span>
             </label>
-            <label><span data-i18n>RFID tag (EPC)</span>
-                <input name="epc" class="code" autocomplete="off" maxlength="24" value="<?= $e($product['epc'] ?? '') ?>">
-                <span data-error="epc" class="field-error"></span>
-                <button class="button" type="button" id="capture-epc"><span data-i18n>Read EPC from reader</span></button><span id="epc-status" role="status" class="hint"></span>
-            </label>
+            <div>
+                <label for="product-epc"><span data-i18n>RFID tag (EPC)</span>
+                    <input id="product-epc" name="epc" class="code" autocomplete="off" maxlength="24"
+                        value="<?= $e($product['epc'] ?? '') ?>" aria-describedby="epc-status">
+                    <span data-error="epc" class="field-error"></span>
+                </label>
+                <button class="button" type="button" id="capture-epc" data-i18n>Read EPC from reader</button>
+                <span id="epc-status" role="status" class="hint"></span>
+            </div>
         </div>
     </div>
     <div class="editor-footer">

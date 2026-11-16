@@ -3,16 +3,18 @@
     const checkoutKey = payment.elements.namedItem('key').value;
     const storageKey = 'superstore.basket';
     const cart = new Map();
+    const seenTags = new Set();
     try {
         const saved = JSON.parse(sessionStorage.getItem(storageKey));
         if (saved?.key === checkoutKey) {
             for (const item of saved.items) cart.set(item.id, item);
+            for (const epc of saved.epcs || []) seenTags.add(epc);
         }
     } catch {}
 
     function saveBasket() {
         try {
-            sessionStorage.setItem(storageKey, JSON.stringify({key: checkoutKey, items: [...cart.values()]}));
+            sessionStorage.setItem(storageKey, JSON.stringify({key: checkoutKey, items: [...cart.values()], epcs: [...seenTags]}));
         } catch {}
     }
 
@@ -31,7 +33,7 @@
     let scanCursor = null;
     let readerSession;
     let pollTimer;
-    const seenTags = new Set();
+    const ignoredTags = new Set();
     const reader = document.getElementById('reader');
     const readerStatus = document.getElementById('reader-status');
     const scanInput = document.getElementById('code');
@@ -40,9 +42,9 @@
     async function pollReader(session) {
         let changed = false;
         try {
-            if (busy) return;
+            if (busy || step !== null) return;
 
-            const query = scanCursor === null ? '' : '?after=' + scanCursor;
+            const query = scanCursor === null ? '?arm=1' : '?after=' + scanCursor;
             const options = { signal: session.signal, cache: 'no-store' };
             const response = await fetch('/api/scans/latest' + query, options);
             if (!response.ok) throw new Error('Reader feed unavailable. Retrying.');
@@ -53,11 +55,12 @@
                 scanCursor = result.last_id;
             } else {
                 for (const scan of result.scans) {
-                    if (seenTags.has(scan.epc)) {
+                    const epc = scan.epc.trim().toUpperCase();
+                    if (seenTags.has(epc) || ignoredTags.has(epc)) {
                         scanCursor = scan.id;
                         continue;
                     }
-                    const lookup = await fetch('/api/products/lookup?type=epc&code=' + encodeURIComponent(scan.epc), options);
+                    const lookup = await fetch('/api/products/lookup?type=epc&code=' + encodeURIComponent(epc), options);
                     if (!lookup.ok && lookup.status !== 404) throw new Error('Product lookup unavailable. Retrying.');
                     const found = await lookup.json();
                     if (session.signal.aborted || busy) return;
@@ -67,19 +70,21 @@
                         const quantity = (cart.get(product.id)?.quantity || 0) + 1;
                         if (quantity <= Math.min(product.in_stock, 1000)) {
                             cart.set(product.id, {...product, quantity});
+                            seenTags.add(epc);
                             if (!scanInput.value || scanInput.value === lastAutoAddedEpc) {
-                                scanInput.value = scan.epc;
-                                lastAutoAddedEpc = scan.epc;
+                                scanInput.value = epc;
+                                lastAutoAddedEpc = epc;
                                 if (document.activeElement === scanInput) scanInput.select();
                             }
                             changed = true;
                         } else {
+                            ignoredTags.add(epc);
                             message('Not enough stock for ' + product.name, true);
                         }
                     } else {
-                        message('Unknown RFID tag: ' + scan.epc, true);
+                        ignoredTags.add(epc);
+                        message('Unknown RFID tag: ' + epc, true);
                     }
-                    seenTags.add(scan.epc);
                     scanCursor = scan.id;
                 }
             }
@@ -117,6 +122,8 @@
         readerSession = new AbortController();
         window.setLocalizedText(reader, 'Stop RFID reader');
         window.setLocalizedText(readerStatus, 'Connecting to the RFID scan feed...');
+        scanInput.focus();
+        scanInput.select();
         message('RFID reader started.');
         pollReader(readerSession);
     });
@@ -255,30 +262,72 @@
         if (picker.value) message('Product selected. Add it to your basket.');
     });
 
-    document.getElementById('scan').onsubmit = async event => {
+    const scanQueue = [];
+    let activeTypedCode;
+    let lastTypedCode;
+    let lastTypedAt = 0;
+
+    async function addQueuedScans() {
+        busy = true;
+        render();
+        try {
+            while (scanQueue.length && step === null) {
+                const code = scanQueue.shift();
+                activeTypedCode = code;
+                try {
+                    const response = await fetch('/api/products/lookup?code=' + encodeURIComponent(code));
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message);
+                    const product = result.product;
+                    const epc = product.epc?.trim().toUpperCase();
+                    const inputIsEpc = epc && code.toUpperCase() === epc;
+                    if (inputIsEpc && seenTags.has(epc)) {
+                        message('This RFID tag is already in your basket.');
+                        continue;
+                    }
+
+                    const quantity = (cart.get(product.id)?.quantity || 0) + 1;
+                    if (quantity > Math.min(product.in_stock, 1000)) {
+                        throw new Error('No more stock available for this product.');
+                    }
+                    if (inputIsEpc) seenTags.add(epc);
+                    cart.set(product.id, {...product, quantity});
+                    message('Item added.');
+                } catch (error) {
+                    if (!scanInput.value && !scanQueue.length) {
+                        scanInput.value = code;
+                        scanInput.select();
+                    }
+                    message(error.message || 'Scanner lookup unavailable. Please retry.', true);
+                }
+            }
+        } finally {
+            activeTypedCode = undefined;
+            busy = false;
+            render();
+        }
+    }
+
+    document.getElementById('scan').onsubmit = event => {
         event.preventDefault();
-        if (busy || step !== null) return;
+        if (step !== null) return;
         const code = scanInput.value.trim();
-        if (code === lastAutoAddedEpc) {
+        if (!code) return;
+        if (code.toUpperCase() === lastAutoAddedEpc) {
             message('This RFID tag is already in your basket.');
             scanInput.select();
             return;
         }
-        busy = true;
-        render();
-        try {
-            const response = await fetch('/api/products/lookup?code=' + encodeURIComponent(code));
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.message);
-            const product = result.product;
-            const quantity = (cart.get(product.id)?.quantity || 0) + 1;
-            if (quantity > Math.min(product.in_stock, 1000)) throw new Error('No more stock available for this product.');
-            cart.set(product.id, { ...product, quantity });
-            scanInput.value = '';
-            if (picker) picker.value = '';
-            message('Item added.');
-        } catch (error) { message(error.message || 'Scanner lookup unavailable. Please retry.', true); }
-        finally { busy = false; render(); scanInput.focus(); }
+
+        const now = Date.now();
+        scanInput.value = '';
+        if (picker) picker.value = '';
+        scanInput.focus();
+        if (code === activeTypedCode || code === scanQueue.at(-1) || (code === lastTypedCode && now - lastTypedAt < 700)) return;
+        lastTypedCode = code;
+        lastTypedAt = now;
+        scanQueue.push(code);
+        if (!busy) addQueuedScans();
     };
     let previousPointsError;
     function pointsError() {

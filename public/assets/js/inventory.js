@@ -235,33 +235,80 @@
     }
 
     const capture = document.getElementById('capture-epc');
+    const epcInput = document.getElementById('product-epc');
+    const epcStatus = document.getElementById('epc-status');
+    let captureSession;
+
+    function setEpc(epc) {
+        epcInput.value = epc;
+        if (document.activeElement === epcInput) epcInput.select();
+        window.showNotification('EPC captured. Save the product to assign it.');
+    }
+
+    epcInput?.addEventListener('keydown', event => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        const epc = epcInput.value.trim().toUpperCase();
+        if (!/^[0-9A-F]{1,24}$/.test(epc)) {
+            window.showNotification('The EPC must be up to 24 hexadecimal characters (0-9, A-F).', true);
+            epcInput.select();
+            return;
+        }
+        if (captureSession) {
+            captureSession.abort();
+            setEpc(epc);
+        } else {
+            epcInput.value = epc;
+            epcInput.select();
+        }
+    });
+
     capture?.addEventListener('click', async () => {
-        const status = document.getElementById('epc-status');
+        if (captureSession) return;
+        const session = new AbortController();
+        captureSession = session;
         capture.disabled = true;
+        epcInput.focus();
+        epcInput.select();
+        window.setLocalizedText(epcStatus, 'Connecting to the RFID scan feed...');
+        let expired = false;
+        const timeout = setTimeout(() => {
+            expired = true;
+            session.abort();
+        }, 20000);
+        const options = { signal: session.signal, cache: 'no-store' };
+
         try {
-            let response = await fetch('/api/scans/latest');
-            if (!response.ok) throw new Error('Reader feed unavailable.');
-            const initial = await response.json();
-            window.setLocalizedText(status, 'Place one tag on the reader. Waiting up to 20 seconds.');
-            const deadline = Date.now() + 20000;
-            while (Date.now() < deadline) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                response = await fetch('/api/scans/latest?after=' + initial.last_id);
+            const initial = await fetch('/api/scans/latest?arm=1', options);
+            if (!initial.ok) throw new Error('Reader feed unavailable.');
+            let cursor = (await initial.json()).last_id;
+            if (session.signal.aborted) return;
+            window.setLocalizedText(epcStatus, 'Place one tag on the reader. Waiting up to 20 seconds.');
+
+            while (!session.signal.aborted) {
+                const response = await fetch('/api/scans/latest?after=' + cursor, options);
                 if (!response.ok) throw new Error('Reader feed unavailable.');
                 const result = await response.json();
-                const epcs = [...new Set(result.scans.map(scan => scan.epc))];
+                if (session.signal.aborted) return;
+                cursor = result.last_id;
+                const epcs = [...new Set(result.scans.map(scan => scan.epc.trim().toUpperCase()))];
                 if (epcs.length > 1) throw new Error('Multiple tags detected. Leave only one tag and try again.');
                 if (epcs.length === 1) {
-                    document.querySelector('[name=epc]').value = epcs[0];
-                    window.setLocalizedText(status, 'EPC captured. Save the product to assign it.');
+                    setEpc(epcs[0]);
                     return;
                 }
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
-            window.setLocalizedText(status, 'No tag received. Check that the RFID bridge is running and try again.');
         } catch (error) {
-            window.setLocalizedText(status, error.message);
+            if (!session.signal.aborted) {
+                window.showNotification(error instanceof TypeError ? 'Reader feed unavailable.' : error.message, true);
+            }
         } finally {
+            clearTimeout(timeout);
+            captureSession = undefined;
             capture.disabled = false;
+            window.setLocalizedText(epcStatus, '');
+            if (expired) window.showNotification('No tag received. Check that the RFID bridge is running and try again.', true);
         }
     });
 })();

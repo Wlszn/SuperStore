@@ -62,7 +62,9 @@ class ScanApiController
 
         try {
             if ($after === false || $after === null) {
-                $latest = $this->scans->latest();
+                // Use the time at which checkout starts listening, even if the cursor lookup takes a moment.
+                $before = ($_GET['arm'] ?? '') === '1' ? (new \DateTimeImmutable())->format('Y-m-d\TH:i:s.uP') : null;
+                $latest = $this->scans->latest($before);
                 $scans = $latest === null ? [] : [$latest];
             } else {
                 $scans = $this->scans->after($after);
