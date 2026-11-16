@@ -76,7 +76,10 @@
                     : error.message);
             }
         } finally {
-            if (changed && !busy) render();
+            if (changed && !busy) {
+                render();
+                if (notice.hidden || !notice.classList.contains('error')) message('RFID items added to your basket.');
+            }
             if (!session.signal.aborted) pollTimer = setTimeout(() => pollReader(session), 1000);
         }
     }
@@ -92,20 +95,20 @@
         if (readerSession) {
             stopReader();
             window.setLocalizedText(readerStatus, 'Reader stopped.');
+            message('Reader stopped.');
             return;
         }
         scanCursor = null;
         readerSession = new AbortController();
         window.setLocalizedText(reader, 'Stop RFID reader');
         window.setLocalizedText(readerStatus, 'Connecting to the RFID scan feed...');
+        message('RFID reader started.');
         pollReader(readerSession);
     });
 
     window.addEventListener('pagehide', stopReader);
     function message(text, error = false) {
-        window.setLocalizedText(notice, text);
-        notice.classList.toggle('error', error);
-        notice.hidden = false;
+        window.showNotification(text, error);
     }
     function updateTotal() {
         saveBasket();
@@ -113,7 +116,9 @@
         for (const product of cart.values()) {
             cents += Math.round(Number(product.price) * 100) * product.quantity;
         }
-        window.setLocalizedText(document.getElementById('total'), 'Total $' + (cents / 100).toFixed(2));
+        const total = 'Total $' + (cents / 100).toFixed(2);
+        window.setLocalizedText(document.getElementById('total'), total);
+
     }
 
     function render() {
@@ -171,6 +176,7 @@
         scanInput.value = picker.value;
         scanInput.focus();
         scanInput.select();
+        if (picker.value) message('Product selected. Add it to your basket.');
     });
 
     document.getElementById('scan').onsubmit = async event => {
@@ -199,19 +205,66 @@
             message('Membership code entered. It will be checked when you confirm payment.');
         }
     });
+    const deliveryOption = payment.elements.namedItem('delivery');
+    const address = payment.elements.namedItem('address');
+
+    function estimateDelivery() {
+        const date = new Date();
+        const days = { standard: 3, express: 1, pickup: 0 };
+        date.setDate(date.getDate() + days[deliveryOption.value]);
+        return new Intl.DateTimeFormat('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit'}).format(date);
+    }
+
+    function updateOrderForm() {
+        const pickup = deliveryOption.value === 'pickup';
+        document.getElementById('shipping-address').hidden = pickup;
+        address.disabled = pickup;
+        address.required = !pickup;
+        window.setLocalizedText(document.getElementById('order-estimate'), 'Estimated fulfillment: ' + estimateDelivery());
+    }
+
+    deliveryOption.addEventListener('change', () => {
+        updateOrderForm();
+        message('Delivery option updated.');
+    });
+
+    function validateContactDetails() {
+        const fields = payment.elements;
+        const name = fields.namedItem('name');
+        const phone = fields.namedItem('phone');
+        const digits = phone.value.replace(/\D/g, '');
+        name.value = name.value.trim();
+        address.value = address.value.trim();
+        phone.setCustomValidity(/^[0-9+() .-]+$/.test(phone.value) && digits.length >= 7 && digits.length <= 15
+            ? '' : window.translate('Please enter a valid phone number.'));
+        if (payment.checkValidity()) return true;
+        message('Check your contact and delivery details.', true);
+        payment.reportValidity();
+        return false;
+    }
+
     payment.onsubmit = async event => {
         event.preventDefault();
-        if (busy || !cart.size) return;
+        if (busy || !cart.size || !validateContactDetails()) return;
         stopReader();
         window.setLocalizedText(readerStatus, "Reader stopped for payment.");
         busy = true;
         render();
-        const body = new FormData(event.target);
+        const body = new FormData();
+        for (const field of ['csrf_token', 'key', 'membership_code']) {
+            body.set(field, payment.elements.namedItem(field).value);
+        }
         body.set('items', JSON.stringify([...cart.values()].map(p => ({id:p.id, quantity:p.quantity}))));
         try {
             const response = await fetch('/checkout', {method:'POST',body});
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
+            try {
+                const reference = 'SS-' + String(result.receipt_id).padStart(6, '0');
+                const fulfillment = { delivery: deliveryOption.value, estimate: estimateDelivery() };
+                sessionStorage.setItem('superstore.fulfillment.' + reference, JSON.stringify(fulfillment));
+                sessionStorage.setItem('superstore.inventory.notice', 'Payment confirmed.');
+            } catch {}
             location.assign(result.redirect);
         } catch (error) {
             message(error.message || 'Result uncertain. Retry this basket to check payment safely.', true);
@@ -219,6 +272,7 @@
             render();
         }
     };
+    updateOrderForm();
     render();
     document.getElementById('code').select();
 })();

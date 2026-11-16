@@ -69,6 +69,13 @@ $purchasedAt = (new DateTimeImmutable($receipt['purchased_at']))->setTimezone(ne
     </footer>
 </article>
 
+<?php
+$estimate = $purchasedAt->modify('+3 days')->format('Y-m-d');
+require __DIR__ . '/products/_tracking.php';
+?>
+<script src="/assets/js/tracking.js" defer></script>
+
+
 <div class="heading-actions section-gap receipt-actions">
     <a class="button primary" href="/checkout" data-i18n>New checkout</a>
     <a class="button" href="/account" data-i18n>My account</a>

@@ -10,10 +10,11 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
     <title <?= !isset($product) || $title !== $product['name'] ? 'data-i18n' : '' ?>><?= $e($title) ?> · SuperStore</title>
     <link rel="stylesheet" href="/assets/css/inventory.css">
     <script src="/assets/js/form-utils.js" defer></script>
-    <script src="/assets/js/inventory.js" defer></script>
     <script src="/assets/js/language.js" defer></script>
+    <script src="/assets/js/notifications.js" defer></script>
+    <script src="/assets/js/inventory.js" defer></script>
 </head>
-<body>
+<body data-order-owner="<?= $e($_SESSION['customer_id'] ?? 'guest') ?>">
 <div class="workspace">
     <aside class="sidebar">
         <a class="brand" href="/products"><span class="brand-icon" aria-hidden="true">S</span>SuperStore</a>
@@ -40,4 +41,9 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
             <a href="/products"><span data-i18n>Inventory</span></a><span aria-hidden="true">/</span><span <?= $section !== 'products' || !isset($product) || $title !== $product['name'] ? 'data-i18n' : '' ?>><?= $e($title) ?></span>
         </div>
         <div class="content">
-            <div class="notice" id="notice" role="status" tabindex="-1" hidden></div>
+            <div class="notice toast" id="notice" hidden>
+                <span class="toast-icon" aria-hidden="true"></span>
+                <span id="notice-message" role="status"></span>
+                <button class="toast-close" id="notice-dismiss" type="button" aria-label="Dismiss notification"
+                    data-i18n-aria-label="Dismiss notification">&times;</button>
+            </div>

@@ -3,6 +3,10 @@
     const noticeKey = 'superstore.inventory.notice';
 
     function displayNotice(element, message, isError) {
+        if (element === notice) {
+            window.showNotification(message, isError);
+            return;
+        }
         window.setLocalizedText(element, message);
         element.classList.toggle('error', isError);
         element.hidden = false;
@@ -164,6 +168,7 @@
         const date = productSelect.form.elements.namedItem('received_at');
         quantity.value = '12';
         date.value = date.max;
+        displayNotice(notice, 'Sample delivery filled in.', false);
         quantity.focus();
     });
 

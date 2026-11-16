@@ -16,6 +16,7 @@ class CheckoutController
         $_SESSION['checkout_key'] ??= bin2hex(random_bytes(32));
         $scanCode = $_GET['code'] ?? '';
         $scanCode = is_string($scanCode) && mb_strlen($scanCode) <= 24 ? $scanCode : '';
+        $profile = [];
         $membershipCode = '';
         $membershipUnavailable = false;
 
@@ -24,10 +25,11 @@ class CheckoutController
             try {
                 $members = SupaClient::rows('GET', 'customers', [
                     'id' => 'eq.' . $_SESSION['customer_id'],
-                    'select' => 'membership_number',
+                    'select' => 'name,email,phone,address,membership_number',
                     'limit' => 1,
                 ]);
-                $membershipCode = $members[0]['membership_number'] ?? '';
+                $profile = $members[0] ?? [];
+                $membershipCode = $profile['membership_number'] ?? '';
             } catch (RuntimeException $e) {
                 $membershipUnavailable = true;
             }
@@ -105,6 +107,7 @@ class CheckoutController
             $_SESSION['receipts'][(int) $receipt['id']] = true;
             jsonResponse(200, [
                 'status' => 'success',
+                'receipt_id' => (int) $receipt['id'],
                 'redirect' => '/receipt?id=' . $receipt['id'],
             ]);
         } catch (RuntimeException $error) {
@@ -168,7 +171,7 @@ class CheckoutController
         try {
             $customer = SupaClient::rows('GET', 'customers', [
                 'id' => 'eq.' . $_SESSION['customer_id'],
-                'select' => 'name,email,membership_number,points',
+                'select' => 'name,email,phone,address,membership_number,points',
             ])[0] ?? null;
             $purchases = SupaClient::rows('GET', 'purchases', [
                 'customer_id' => 'eq.' . $_SESSION['customer_id'],

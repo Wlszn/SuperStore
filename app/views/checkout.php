@@ -52,7 +52,7 @@ require __DIR__ . '/products/_start.php';
     </div>
     <p class="empty" id="empty"><span data-i18n>Your basket is empty.</span></p>
 </section>
-<form id="payment" class="panel editor-body section-gap payment-panel">
+<form id="payment" class="panel editor-body section-gap payment-panel" novalidate>
     <input type="hidden" name="csrf_token" value="<?= $e($_SESSION['csrf_token']) ?>">
     <input type="hidden" name="key" value="<?= $e($_SESSION['checkout_key']) ?>">
     <?php if (!isset($_SESSION['customer_id'])): ?>
@@ -60,6 +60,29 @@ require __DIR__ . '/products/_start.php';
     <?php elseif ($membershipUnavailable): ?>
         <p class="hint" data-i18n>Your membership code could not be loaded. You can still scan or enter it.</p>
     <?php endif; ?>
+    <h2 data-i18n>Contact and delivery</h2>
+    <div class="fields checkout-details">
+        <label><span data-i18n>Full name</span>
+            <input name="name" value="<?= $e($profile['name'] ?? '') ?>" autocomplete="name" maxlength="100" required>
+        </label>
+        <label><span data-i18n>Email address</span>
+            <input name="email" value="<?= $e($profile['email'] ?? '') ?>" type="email" autocomplete="email" maxlength="100" required>
+        </label>
+        <label><span data-i18n>Phone number</span>
+            <input name="phone" value="<?= $e($profile['phone'] ?? '') ?>" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" required>
+        </label>
+        <label><span data-i18n>Delivery option</span>
+            <select name="delivery">
+                <option value="standard" data-i18n>Standard delivery</option>
+                <option value="express" data-i18n>Express delivery</option>
+                <option value="pickup" data-i18n>Store pickup</option>
+            </select>
+        </label>
+        <label class="wide" id="shipping-address"><span data-i18n>Shipping address</span>
+            <input name="address" value="<?= $e($profile['address'] ?? '') ?>" autocomplete="street-address" maxlength="255" required>
+        </label>
+        <p id="order-estimate" class="hint wide"></p>
+    </div>
     <label for="membership-code"><span data-i18n>Membership card barcode (optional)</span></label>
     <input id="membership-code" name="membership_code" value="<?= $e($membershipCode) ?>" maxlength="64" autocomplete="off">
     <p class="hint"><span data-i18n>Earn 10 points per dollar and receive an emailed receipt with a membership code. Clear the field to continue as a guest.</span></p>

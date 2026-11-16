@@ -49,6 +49,7 @@ function view(string $name): void
 
 $routes = [
     'POST /account/membership' => [App\Controllers\CheckoutController::class, 'membership'],
+    'GET /order-confirmation' => fn() => view('order-confirmation'),
     'GET /checkout' => [App\Controllers\CheckoutController::class, 'index'],
     'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
     'GET /account' => [App\Controllers\CheckoutController::class, 'account'],
