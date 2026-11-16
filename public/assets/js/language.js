@@ -388,6 +388,7 @@
     "Membership card not found.": "Carte de membre introuvable.",
     "Membership lookup unavailable. Please retry.": "V\u00e9rification de la carte indisponible. R\u00e9essayez.",
     "Scan or enter a membership card.": "Balayez ou saisissez une carte de membre.",
+    "This barcode is not valid (wrong last digit). Scan it again or check for a typo.": "Ce code-barres n\u2019est pas valide (dernier chiffre incorrect). Balayez-le de nouveau ou v\u00e9rifiez la saisie.",
     "Contact and delivery": "Coordonn\u00e9es et livraison",
     "Delivery option": "Mode de livraison",
     "Standard delivery": "Livraison standard",
