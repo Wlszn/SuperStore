@@ -43,6 +43,15 @@
         }
 
         for (const badge of document.querySelectorAll('[data-order-status]')) {
+            // In-store purchases have no delivery: show them as completed, without tracking.
+            const trackingLink = badge.closest('tr')?.querySelector('.tracking-link');
+            if (!readFulfillment(badge.dataset.orderStatus) && badge.dataset.pickup === undefined) {
+                if (trackingLink) trackingLink.hidden = true;
+                badge.classList.add('is-delivered');
+                window.setLocalizedText(badge, 'Completed');
+                continue;
+            }
+            if (trackingLink) trackingLink.hidden = false;
             const delivered = readStage(badge.dataset.orderStatus) === 3;
             const pickup = badge.dataset.pickup === 'true' || readFulfillment(badge.dataset.orderStatus)?.delivery === 'pickup';
             badge.classList.toggle('is-delivered', delivered);
@@ -64,6 +73,10 @@
     const reference = tracking.dataset.orderReference;
     let currentStep = readStage(reference);
     const fulfillment = readFulfillment(reference);
+    if (!fulfillment && !document.getElementById('order-confirmation')) {
+        tracking.hidden = true;
+        return;
+    }
     if (fulfillment) {
         document.getElementById('tracking-estimate').textContent = fulfillment.estimate;
         if (fulfillment.delivery === 'pickup') {

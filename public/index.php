@@ -52,6 +52,7 @@ $routes = [
     'GET /order-confirmation' => fn() => view('order-confirmation'),
     'GET /checkout' => [App\Controllers\CheckoutController::class, 'index'],
     'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
+    'GET /api/members/lookup' => [App\Controllers\CheckoutController::class, 'memberLookup'],
     'GET /account' => [App\Controllers\CheckoutController::class, 'account'],
     'GET /receipt' => [App\Controllers\CheckoutController::class, 'receipt'],
     'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? (empty($_SESSION['is_admin']) ? '/account' : '/products') : '/login')),
