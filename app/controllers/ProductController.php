@@ -272,6 +272,13 @@ class ProductController
         ]);
     }
 
+    public function pointsCalculate(float $price): int
+    {
+        //for every dollar they get 10 points out of it
+
+        return (int)$price * 10;
+    }
+
     /** GET /api/products/lookup?code=...: the product behind a scanned UPC or EPC. */
     public function lookup(): void
     {
@@ -360,6 +367,7 @@ class ProductController
         return $id === false ? null : $id;
     }
 
+
     /**
      * Show a view with $data as variables (plus $csrfToken).
      * Until the view exists, answers with the data as JSON so the backend can be tested on its own.
@@ -395,6 +403,15 @@ class ProductController
             'message' => 'Please fix the highlighted fields and try again.',
             'errors' => $errors,
         ]);
+    }
+
+    public function getProductByBarcode(string $barcode): ?array
+    {
+        try {
+            return $this->products->findByCode($barcode);
+        } catch (RuntimeException $e) {
+            return null;
+        }
     }
 
     private function serverError(): void

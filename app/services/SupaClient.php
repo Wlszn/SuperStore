@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use RuntimeException;
+use function config\supa_request;
 
 final class SupaClient
 {

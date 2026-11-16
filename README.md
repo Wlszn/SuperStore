@@ -1,109 +1,103 @@
 # SuperStore
 
-A smart-store simulation built for the **Internet of Things** course (420-521-VA, Vanier College, taught by Samad Rostampour) final project.
+A smart-store simulation where sensors, scanners and single-board computers connect the customer experience to store management.
+
+Final project for **Internet of Things (420-521-VA)**, Vanier College.
+
+---
 
 ## Overview
 
-SuperStore simulates a physical store where sensors, actuators and single-board computers connect the customer experience to store management. It is built in phases, each adding to the last:
+SuperStore is built in three phases, each adding to the last.
 
-| Phase | Focus | Status |
+| Phase | Scope | Status |
 |---|---|---|
-| **Phase 1** | Customer registration with LED/buzzer feedback | Done |
-| **Phase 2** | IoT dashboard: fridge sensors over MQTT, thresholds, email alerts, fan control | Done |
-| **Phase 3** | Product management, inventory, barcode/RFID, self-checkout, loyalty points | In progress |
+| **1. Customer registration** | Sign-up and login with LED feedback | Done |
+| **2. IoT dashboard** | Fridge sensors over MQTT, thresholds, email alerts, fan control | Done |
+| **3. Store operations** | Product management, inventory, barcode/RFID scanning, self-checkout, loyalty points | In progress |
 
-The store has two sides:
+The application has two sides:
 
-- **Management side**: a dashboard for fridges, products and inventory (product management is admin-only).
-- **Customer side**: account creation and a self-checkout station where customers scan and pay on their own.
+- **Management** (admins): fridge monitoring, products and inventory.
+- **Customers**: account, self-checkout station, points and receipts.
+
+## Features
+
+**Phase 1: Registration**
+- Sign-up and login with server-side validation and hashed passwords
+- Blue LED on success, red LED on failure
+
+**Phase 2: Fridge monitoring**
+- Two ESP32 + DHT11 sensors publish temperature and humidity over MQTT (`Frig1`, `Frig2`)
+- Live dashboard with four gauges, fan status and over-temperature alerts
+- Per-fridge temperature thresholds stored in the database
+- Email alert when a fridge is too warm; replying **YES** turns the fan (DC motor) on
+
+**Phase 3: Store operations**
+- Product catalogue with UPC (barcode) and EPC (RFID tag)
+- Each product is defined once and received many times; stock is computed, never stored
+- Inventory with low-stock flags; barcode scanner and RFID reader support
+- Self-checkout: scan all items at once, membership card, payment simulation, points, emailed receipt (email requires the receipt worker)
 
 ## Tech Stack
 
-| Layer | Choice |
+| Layer | Technology |
 |---|---|
-| Backend | PHP 8 (MVC, no framework) |
-| Database | PostgreSQL hosted on Supabase, used through its REST API (PostgREST) |
-| Front-end | HTML, CSS, vanilla JavaScript |
-| Hardware control | Python 3 (`gpiozero`) on a Raspberry Pi 5 |
-| Messaging | MQTT (Mosquitto broker on the Pi) |
+| Backend | PHP 8, MVC (no framework) |
+| Database | PostgreSQL on Supabase, through its REST API |
+| Frontend | HTML, CSS, JavaScript |
+| Hardware control | Python 3 (`gpiozero`, `paho-mqtt`, `pyserial`) on Raspberry Pi 5 |
+| Messaging | MQTT (Mosquitto) |
 | Microcontrollers | ESP32 + DHT11 (Arduino C++) |
 | Scanners | USB barcode scanner, Chafon CF600 UHF RFID reader |
-
-The web app and the Python scripts run on each Raspberry Pi. The database is shared on Supabase, so the whole team works against the same data.
 
 ## Architecture
 
 ```
- ESP32 + DHT11 ──MQTT──▶ Mosquitto (Pi) ──▶ monitor.py ──HTTP──▶ PHP app (Pi) ──REST──▶ Supabase
- (Frig1, Frig2)                              │  ▲                    ▲   │
-                                   alert email│  │YES reply           │   │ GET /api/fan
-                                              ▼  │                    │   ▼
-                                             Gmail              browser   fan.py ──GPIO──▶ DC motor
- RFID reader (USB) ──▶ rfid.py ──POST /api/scans──▶ PHP app
- Barcode scanner (USB keyboard) ──▶ types into the browser form
+ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ──HTTP──▶ ┐
+RFID reader ───────────▶ reader script ────HTTP──────────▶ │ PHP app (Pi) ──REST──▶ Supabase
+Barcode scanner ──▶ browser (types like a keyboard) ─────▶ │
+                         fan.py ◀── GET /api/fan ───────── ┘
+                           └──GPIO──▶ motor driver ──▶ DC motor
 ```
 
-The browser never talks to the hardware directly. Every device goes through the PHP API, and the PHP API is the only thing that talks to the database.
+Devices never talk to the database directly: every device and page goes through the PHP API, and only the models talk to Supabase.
+
+**Request flow:** `public/index.php` matches the route and calls a controller → the controller validates the input and calls a model → the model queries Supabase → the controller renders a view or returns JSON.
 
 ## Project Structure
 
 ```
 SuperStore/
 ├── app/
-│   ├── controllers/
-│   │   ├── AuthController.php        # sign up, login, logout (Phase 1)
-│   │   ├── ThresholdController.php   # per-fridge temperature limits (Phase 2)
-│   │   ├── ReadingApiController.php  # sensor readings in, dashboard data out (Phase 2)
-│   │   ├── FanApiController.php      # fan on/off state (Phase 2)
-│   │   ├── ProductController.php     # products, inventory, receive stock (Phase 3)
-│   │   └── ScanApiController.php     # RFID scans (Phase 3)
-│   ├── models/
-│   │   ├── CustomerModel.php
-│   │   ├── Fridge.php  Reading.php  FanState.php  Alert.php
-│   │   └── ProductModel.php  ReceptionModel.php  ScanModel.php
-│   ├── services/
-│   │   └── SupaClient.php            # throws on a failed Supabase request
-│   └── views/                        # login, signup, dashboard, thresholds, products/*
+│   ├── controllers/   # Auth, Threshold, ReadingApi, FanApi, Product, ScanApi
+│   ├── models/        # Customer, Fridge, Reading, FanState, Alert, Product, Reception, Scan
+│   ├── services/      # SupaClient (Supabase requests)
+│   └── views/         # login, signup, dashboard, thresholds
 ├── config/
-│   ├── db.php                        # reads .env, supa_request() REST helper
-│   └── db.sql                        # full schema, one section per phase
-├── docs/
-│   ├── ER.md                         # database design: tables, relationships, examples
-│   ├── SuperStore-ERD.drawio         # ER diagram (edit at app.diagrams.net)
-│   └── SuperStore-ERD.png            # ER diagram image
-├── public/
-│   ├── index.php                     # front controller + every route
-│   └── assets/                       # css, js (form-utils.js), images
-├── scripts/
-│   ├── gpio_signal.py                # blue/red LED (Phase 1)
-│   ├── monitor.py                    # MQTT -> API, alert email, YES reply (Phase 2)
-│   ├── fan.py                        # drives the DC motor from the fan state (Phase 2)
-│   └── mqtt.py                       # ESP32 sketch (Arduino C++, flashed to the boards)
-├── .env.example
-└── README.md
+│   ├── db.php         # loads .env, Supabase REST helper
+│   └── db.sql         # database schema, one section per phase
+├── docs/              # database design, ER diagram, API reference
+├── public/            # index.php (routes) and assets
+└── scripts/           # Raspberry Pi and ESP32 programs
 ```
 
-**How a request flows (MVC):** `public/index.php` matches `"METHOD /path"` in its `$routes` array and calls the controller. The controller validates the input and calls a model. The model is the only place that builds Supabase requests (`SupaClient::rows()`). The controller then either renders a view or answers in JSON.
+## Getting Started
 
-## Setup
+### 1. Configuration
 
-### 1. Environment
+Copy `.env.example` to `.env` and fill in:
 
-Copy `.env.example` to `.env` and fill it in:
-
-| Key | Where to find it |
+| Key | Description |
 |---|---|
 | `SUPABASE_URL` | Supabase → Project Settings → API |
-| `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API keys (secret key, server only) |
-| `GMAIL_USER` | The Gmail account that sends the alerts |
-| `GMAIL_APP_PASSWORD` | Google Account → Security → App passwords (16 characters) |
-| `ALERT_TO` | The address that receives fridge alerts (defaults to `GMAIL_USER`) |
-
-`.env` is ignored by git. Never commit it.
+| `SUPABASE_SECRET_KEY` | Secret key (server only, never commit it) |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Gmail account and app password used to send emails |
+| `ALERT_TO` | Address that receives fridge alerts (defaults to `GMAIL_USER`) |
 
 ### 2. Database
 
-In the Supabase SQL Editor, run the sections of `config/db.sql` that the database doesn't have yet (each phase has its own section). Then make your account an admin:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Apply `config/checkout.sql`, `config/membership.sql`, and `config/receipt_emails.sql` in that order. Those three files can also be applied to an existing Phase 3 database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -112,164 +106,67 @@ UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
 ### 3. Raspberry Pi
 
 ```bash
-sudo apt install php-cli php-curl mosquitto python3-gpiozero python3-paho-mqtt python3-dotenv
-php -S 0.0.0.0:8000 -t public        # the scripts expect the app on port 8000
+sudo apt install php-cli php-curl mosquitto python3-gpiozero python3-paho-mqtt python3-dotenv python3-serial
+php -S 0.0.0.0:8000 -t public
 ```
 
-Let the ESP32s reach the broker. Add this to `/etc/mosquitto/conf.d/superstore.conf`, then run `sudo systemctl restart mosquitto`:
+In separate terminals:
+
+```bash
+python3 scripts/monitor.py   # fridge readings and email alerts
+python3 scripts/fan.py       # fan motor
+```
+
+Allow the ESP32 boards to reach the broker (`/etc/mosquitto/conf.d/superstore.conf`), then restart Mosquitto:
 
 ```
 listener 1883
 allow_anonymous true
 ```
 
-Each script runs in its own terminal:
-
-```bash
-python3 scripts/monitor.py   # fridge readings + email alerts
-python3 scripts/fan.py       # fan motor
-```
-
 ### 4. ESP32 boards
 
-Open `scripts/mqtt.py` in the Arduino IDE (it is an Arduino sketch). Install the **PubSubClient** and **DHT sensor library** libraries, then set `WIFI_SSID`, `WIFI_PASS` and `MQTT_HOST` (the Pi's IP address). Flash one board with `TOPIC = "Frig1"` and the other with `"Frig2"`.
+Open `scripts/mqtt.py` (an Arduino sketch) in the Arduino IDE, install **PubSubClient** and **DHT sensor library**, set the Wi-Fi credentials and the Pi's IP address, and flash one board with `TOPIC = "Frig1"` and the other with `"Frig2"`.
 
----
+### 5. RFID reader
 
-## Phase 1 — Customer Registration
+See [CF600 reader setup](docs/RFID.md) for the USB SDK bridge used by the checkout and product pages.
 
-- Sign-up page (name, email, phone, address, password) that stores the customer in the database.
-- Validation in the browser and again on the server, with one clear message per field.
-- Passwords stored as `password_hash()` hashes; sign-in starts a fresh session.
-- **On success:** confirmation message + **blue LED** for 2 seconds.
-- **On failure:** error message + **red LED** for 2 seconds.
+### 6. Checkout demo and receipt email
 
-`AuthController` runs `scripts/gpio_signal.py success|fail` in the background, so the page doesn't wait for the LED.
+See the [demonstration guide](docs/Demonstration.md) for the delivery, scan, payment, and receipt workflow. Run `python3 scripts/receipt_worker.py` with the Gmail settings configured to send receipt emails.
 
-| Route | What |
+## API
+
+| Area | Routes |
 |---|---|
-| `GET /signup`, `GET /login` | Pages |
-| `POST /register` | Create an account (JSON) |
-| `POST /login` | Sign in (JSON) |
-| `GET /logout` | Sign out |
+| Accounts | `POST /register`, `POST /login`, `GET /logout` |
+| Dashboard | `GET /dashboard`, `GET/POST /thresholds`, `GET /api/thresholds` |
+| Sensors and fan | `POST /api/readings`, `GET /api/readings/latest`, `GET/POST /api/fan` |
+| Products (admin) | `GET /products`, `/products/create`, `/products/edit`, `/products/show`, `/products/receive` |
+| Product actions (admin) | `POST /products`, `/products/update`, `/products/delete`, `/receptions` |
+| Scanners | `GET /api/products/lookup?code=`, `POST /api/scans`, `GET /api/scans/latest` |
 
-**Hardware:** blue + red LEDs, resistors, buzzer, breadboard, wires, Raspberry Pi 5.
+Request and response formats: [`docs/API.md`](docs/API.md).
 
-## Phase 2 — IoT Dashboard & Fridge Monitoring
+## Database
 
-Two ESP32 boards with DHT11 sensors each watch one fridge and publish `{"temp": 4.0, "hum": 55.0}` every 5 seconds to the MQTT topics **`Frig1`** and **`Frig2`**.
+Design, relationships and examples: [`docs/ER.md`](docs/ER.md). Editable diagram: [`docs/SuperStore-ERD.drawio`](docs/SuperStore-ERD.drawio).
 
-**How it works:**
+![ER diagram](docs/SuperStore-ERD.png)
 
-1. `monitor.py` subscribes to both topics and forwards each reading to `POST /api/readings`.
-2. The API stores the reading and answers whether it is above that fridge's threshold.
-3. When it is above, `monitor.py` emails *"The current temperature is X °C. Would you like to turn on the fan?"* (at most one email per fridge every 2 minutes).
-4. Every 15 seconds `monitor.py` checks the inbox. A reply that starts with **YES** calls `POST /api/fan {"on": true}`.
-5. `fan.py` asks `GET /api/fan` once a second and switches the DC motor (the "fan") through the motor driver.
-6. The dashboard polls `GET /api/readings/latest` and shows **4 gauges** (temperature + humidity per fridge), the **fan ON/OFF icon** and a notification when a fridge is too warm.
+## Hardware
 
-Thresholds are stored per fridge in the database and edited on the **Thresholds** page.
-
-| Route | What |
-|---|---|
-| `GET /dashboard` | Gauges, fan icon, alerts |
-| `GET /thresholds`, `POST /thresholds` | View / change a fridge's limit (login + CSRF) |
-| `GET /api/thresholds` | Every fridge with its limit (JSON) |
-| `POST /api/readings` | `{"fridge":"Frig1","temp":4.0,"hum":55.0}`, sent by `monitor.py` |
-| `GET /api/readings/latest` | Latest reading per fridge + fan state (dashboard) |
-| `GET /api/fan`, `POST /api/fan` | Read / set `{"on": true}` |
-
-**Hardware:** 2 × ESP32, 2 × DHT11, DC motor + motor driver, breadboard, Raspberry Pi 5.
-
-## Phase 3 — Product Management, Inventory & Self-Checkout
-
-**Management (admins only):**
-
-- Register, edit and delete products: name, category, price, UPC (max 13), EPC (max 24), producer, optional image.
-- Each product is defined once but **received many times**. Every delivery records its quantity and date.
-- Inventory dashboard with the stock of every product. Low stock (5 or fewer) is flagged.
-- UPC read by the barcode scanner, EPC read by the RFID reader.
-- A notification after every action (add, edit, delete, receive stock).
-
-**Self-checkout (customers):**
-
-- Scan every product at once with the RFID reader; the list and total update live.
-- Remove items, enter a membership card, simulate payment.
-- Earn loyalty points; a receipt is emailed to the customer's registered address.
-- Customers see their points and purchase history (past receipts).
-
-**Database:** see [`docs/ER.md`](docs/ER.md) for the ER diagram and the relations between products, customers and purchases. Stock is not stored. It is computed by the `product_stock` view as *everything received − everything sold*.
-
-### Pages (admin only)
-
-Sign in as an administrator and open **Products** from your account or the store dashboard. Each page receives the variables listed, plus `$csrfToken`.
-
-| Route | View | Variables |
+| Component | Phase | Connection |
 |---|---|---|
-| `GET /products` | `products/index.php` | `$products`, `$lowStock` |
-| `GET /products/create` | `products/form.php` | `$product = null` |
-| `GET /products/edit?id=5` | `products/form.php` | `$product` |
-| `GET /products/show?id=5` | `products/show.php` | `$product`, `$receptions` |
-| `GET /products/receive?id=5` | `products/receive.php` | `$products`, `$selectedId` (may be null), `$today` |
+| Blue / red LEDs | 1 | GPIO 17 / GPIO 18 |
+| 2 × ESP32 + DHT11 | 2 | Wi-Fi (MQTT) |
+| DC motor + driver | 2 | GPIO 22 (enable), 27 (in 1), 17 (in 2) |
+| USB barcode scanner | 3 | USB (keyboard mode) |
+| Chafon CF600 RFID reader | 3 | USB (SDK bridge) |
 
-A product row: `id, name, category, price, upc, epc, producer, image_url, in_stock, low_stock`.
-A reception row: `id, product_id, quantity, received_at`.
-
-### Form actions (admin only, JSON)
-
-Send with `postForm()` from `form-utils.js`. Every form includes `csrf_token`.
-
-| Route | Fields |
-|---|---|
-| `POST /products` | `name, category, price, upc, epc, producer, image_url` (UPC **or** EPC required) |
-| `POST /products/update` | `id` + the same fields |
-| `POST /products/delete` | `id` |
-| `POST /receptions` | `product_id, quantity, received_at` (`YYYY-MM-DD`, empty = today) |
-
-The response includes a status and message. Validation errors are keyed by field name:
-
-```json
-{"status": "success", "message": "Product \"Coca-Cola 500ml\" added successfully.", "product": {...}}
-{"status": "error", "message": "Please fix the highlighted fields and try again.", "errors": {"upc": "Another product already uses this UPC."}}
-```
-
-Error slots in the form: `<span class="field-error" data-error="upc"></span>` (one per field name).
-
-### Scanner APIs (no login, shared with self-checkout)
-
-| Route | Use |
-|---|---|
-| `GET /api/products/lookup?code=` | The product behind a UPC or EPC (`404` if none). Spaces and lowercase are fine. |
-| `POST /api/scans` | Body `{"epc":"E280..."}` or `{"epcs":["E280...","E280..."]}`. Sent by `scripts/rfid.py`. |
-| `GET /api/scans/latest` | The newest scan. Remember its `last_id`. |
-| `GET /api/scans/latest?after=12` | Every scan newer than 12, oldest first, plus the new `last_id`. Poll every second. |
-
-- **Barcode scanner:** use USB keyboard mode with an Enter suffix. In **Products**, choose **Scan barcode** to open a matching product, or start a new one with the UPC prefilled. In **Receive stock**, scan to select the product before recording the quantity and date. In the product form, focus **Barcode (UPC)** and scan to fill the field. You can also type any UPC manually.
-- **Planned RFID reader capture for the product form:** poll `/api/scans/latest?after=<last_id>` and put the newest `epc` into the EPC field.
-
-### RFID reader setup (Raspberry Pi)
-
-1. Switch the CF600 to **CDC-COM** mode with Chafon's configuration tool (Windows, from the SDK).
-2. `sudo modprobe usbserial vendor=0x0483 product=0x5750`
-3. `ls /dev/ttyUSB*` should list the reader.
-4. Add yourself to the serial group once: `sudo usermod -aG dialout $USER`, then log out and back in.
-
-**Hardware:** Chafon CF600 UHF RFID reader + tags, USB barcode scanner, Raspberry Pi 5.
-
----
-
-## Raspberry Pi Pinout (BCM numbers)
-
-| Pin | Used by | Part |
-|---|---|---|
-| GPIO 17 | `gpio_signal.py` | Blue LED |
-| GPIO 18 | `gpio_signal.py` | Red LED |
-| GPIO 22 | `fan.py` | Motor driver enable |
-| GPIO 27 | `fan.py` | Motor driver input 1 |
-| GPIO 17 | `fan.py` | Motor driver input 2 |
-
-GPIO 17 is listed twice: the Phase 1 blue LED and the Phase 2 motor driver share it. Move one of them before running both on the same Pi.
+All pins use BCM numbering on a Raspberry Pi 5.
 
 ## Team
 
-Group of 4, each with a Raspberry Pi 5. Phase 3 is split into management (inventory backend + database, inventory frontend) and self-checkout.
+Group of four, each with a Raspberry Pi 5. Phase 3 is split between management (inventory backend, database, inventory pages) and self-checkout.

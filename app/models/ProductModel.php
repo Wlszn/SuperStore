@@ -49,6 +49,19 @@ class ProductModel
         $rows = $epcOnly ? [] : SupaClient::rows('GET', self::STOCK_VIEW, [
             'select' => self::COLUMNS, 'upc' => 'eq.' . $code, 'limit' => 1,
         ]);
+        if (!$rows && !$epcOnly && ctype_digit($code)) {
+            $alternateUpc = strlen($code) === 12 ? self::normalizeUpc($code) : '';
+            if (strlen($code) === 13 && str_starts_with($code, '0')) {
+                $alternateUpc = substr($code, 1);
+            }
+            if ($alternateUpc !== '') {
+                $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
+                    'select' => self::COLUMNS,
+                    'upc' => 'eq.' . $alternateUpc,
+                    'limit' => 1,
+                ]);
+            }
+        }
         if (!$rows && preg_match('/^[0-9a-fA-F]{1,24}$/D', $code)) {
             $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
                 'select' => self::COLUMNS, 'epc' => 'eq.' . strtoupper($code), 'limit' => 1,
@@ -56,6 +69,7 @@ class ProductModel
         }
         return $rows ? $this->normalize($rows[0]) : null;
     }
+
 
     /** Insert a product. $data must come from validate(). Returns the new row. */
     public function create(array $data): array
@@ -78,6 +92,11 @@ class ProductModel
     public function delete(int $id): void
     {
         SupaClient::rows('DELETE', self::TABLE, ['id' => 'eq.' . $id]);
+    }
+
+    public function pointsCalculate(float $price): int
+    {
+        return (int)$price * 10;
     }
 
     public function validate(array $input, ?int $id = null): array
@@ -167,6 +186,11 @@ class ProductModel
         }
 
         return SupaClient::rows('GET', self::TABLE, $query) !== [];
+    }
+
+    private static function normalizeUpc(string $upc): string
+    {
+        return strlen($upc) === 12 ? '0' . $upc : $upc;
     }
 
     /** Make sure every value has a predictable PHP type. */
