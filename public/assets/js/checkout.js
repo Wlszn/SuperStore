@@ -138,6 +138,40 @@
             window.setLocalizedText(pointsDiscount, 'Points discount: $' + (discount / 100).toFixed(2));
         }
         window.setLocalizedText(document.getElementById('total'), 'Total $' + ((cents - discount) / 100).toFixed(2));
+        showMember(cents - discount);
+    }
+
+    // Membership card check: the result of the last lookup, or null when no valid card is entered.
+    const memberStatus = document.getElementById('member-status');
+    let member = null;
+
+    function showMember(paidCents) {
+        if (!member) return;
+        // Same rule as complete_checkout(): 10 points per dollar paid, rounded down.
+        window.setLocalizedText(memberStatus, 'Member: {0} \u00b7 {1} points. This purchase earns {2} points.'
+            .replace('{0}', member.first_name).replace('{1}', member.points).replace('{2}', Math.floor(paidCents / 10)));
+    }
+
+    async function lookUpMember() {
+        const code = membership.value.trim();
+        member = null;
+        memberStatus.hidden = code === '';
+        memberStatus.classList.remove('error');
+        if (code === '') return;
+        try {
+            const response = await fetch('/api/members/lookup?code=' + encodeURIComponent(code), {cache: 'no-store'});
+            const result = await response.json();
+            if (code !== membership.value.trim()) return; // the field changed while waiting
+            if (!response.ok) throw new Error(result.message);
+            member = result.member;
+            updateTotal();
+            message('Membership card accepted.');
+        } catch (error) {
+            const text = error.message || 'Membership lookup unavailable. Please retry.';
+            memberStatus.classList.add('error');
+            window.setLocalizedText(memberStatus, text);
+            message(text, true);
+        }
     }
 
     function render() {
@@ -248,11 +282,17 @@
 
     membership.addEventListener('input', onPointsInput);
     pointsInput?.addEventListener('input', onPointsInput);
+    // The USB barcode scanner types the card number then presses Enter.
     membership.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
             event.preventDefault();
-            message('Membership code entered. It will be checked when you confirm payment.');
+            lookUpMember();
         }
+    });
+    membership.addEventListener('change', lookUpMember);
+    membership.addEventListener('input', () => {
+        member = null;
+        memberStatus.hidden = true;
     });
     const deliveryOption = payment.elements.namedItem('delivery');
     const address = payment.elements.namedItem('address');
@@ -341,5 +381,6 @@
     };
     updateOrderForm();
     render();
+    if (membership.value.trim() !== '') lookUpMember(); // signed-in member: card filled in already
     document.getElementById('code').select();
 })();

@@ -86,6 +86,7 @@ require __DIR__ . '/products/_start.php';
     </div>
     <label for="membership-code"><span data-i18n>Membership card barcode (optional)</span></label>
     <input id="membership-code" name="membership_code" value="<?= $e($membershipCode) ?>" maxlength="64" autocomplete="off">
+    <p id="member-status" class="hint" role="status" hidden></p>
     <p class="hint"><span data-i18n>Earn 10 points per dollar and receive an emailed receipt with a membership code. Clear the field to continue as a guest.</span></p>
     <p class="hint"><span data-i18n>Classroom payment simulation. Prices are final in CAD. No card details required.</span></p>
     <?php if ($membershipCode !== ''): ?>

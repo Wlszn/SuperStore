@@ -236,6 +236,8 @@ dialog .notice { margin: 14px 0 0; }
 .payment-panel h2, .payment-panel .hint { margin: 0; }
 .checkbox-line { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
 .checkbox-line input { accent-color: var(--blue); width: 18px; height: 18px; }
+#member-status { color: #1e7a46; font-weight: 600; }
+#member-status.error { color: var(--red); }
 
 @media (max-width: 560px) {
     .sidebar nav { order: 1; width: 100%; }
