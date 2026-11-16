@@ -11,7 +11,7 @@ use RuntimeException;
 class AlertController
 {
     private const TEMP_THRESHOLD = 30.0;
-    private const EMAIL_SCRIPT   = __DIR__ . '/../../scripts/email.py';
+    private const EMAIL_SCRIPT   = __DIR__ . '/../../scripts/sendEmail.py';
 
     public function __construct(private PDO $db) {}
 
@@ -40,7 +40,7 @@ class AlertController
     private function sendAlertEmail(float $temperature): void
     {
         if (!is_file(self::EMAIL_SCRIPT)) {
-            throw new RuntimeException('email.py not found at ' . self::EMAIL_SCRIPT);
+            throw new RuntimeException('sendEmail.py not found at ' . self::EMAIL_SCRIPT);
         }
 
         // trim() collapses the whitespace left by sprintf formatting.

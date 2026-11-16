@@ -7,6 +7,8 @@ session_start();
 date_default_timezone_set('America/Toronto');
 
 use App\Controllers\AuthController;
+use App\Controllers\BarcodeController;
+use App\Controllers\CustomerController;
 use App\Controllers\ThresholdController;
 use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
@@ -56,6 +58,7 @@ $routes = [
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],
     'GET /logout' => [AuthController::class, 'logout'],
+    'POST /api/customer/points' => [CustomerController::class, 'pointsEarned'],
 
     'GET /thresholds' => [ThresholdController::class, 'index'],
     'POST /thresholds' => [ThresholdController::class, 'update'],
@@ -80,7 +83,7 @@ $routes = [
 
     // Phase 3: scanners (used by management and self-checkout)
     'GET /api/products/lookup' => [ProductController::class, 'lookup'],
-    'POST /api/scans'          => [ScanApiController::class, 'store'],
+    'POST /api/scans'          => [BarcodeController::class, 'processBarcode'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
 ];
 

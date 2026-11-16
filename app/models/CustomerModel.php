@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use function config\supa_delete_customer;
+use function config\supa_find_customer_by_email;
+use function config\supa_find_customer_by_id;
+use function config\supa_insert_customer;
+use function config\supa_update_customer;
+
 class CustomerModel
 {
     private ?int $id;
@@ -14,8 +20,21 @@ class CustomerModel
     private string $createdAt;
     private string $passwordHash;
     private bool $isAdmin;
+    private string $membershipNumber;
+    private int $points;
 
-    public function __construct(?int $id, string $name, string $email, string $phone, string $address, ?string $createdAt = null, string $passwordHash = '', bool $isAdmin = false)
+    public function __construct(
+        ?int $id,
+        string $name,
+        string $email,
+        string $phone,
+        string $address,
+        ?string $createdAt = null,
+        string $passwordHash = '',
+        bool $isAdmin = false,
+        string $membershipNumber = '',
+        int $points = 0
+    )
     {
         $this->id = $id;
         $this->name = $name;
@@ -25,6 +44,8 @@ class CustomerModel
         $this->createdAt = $createdAt ?? date('Y-m-d H:i:s');
         $this->passwordHash = $passwordHash;
         $this->isAdmin = $isAdmin;
+        $this->membershipNumber = $membershipNumber;
+        $this->points = $points;
     }
 
     public function getId(): ?int
@@ -52,6 +73,16 @@ class CustomerModel
         return $this->address;
     }
 
+    public function getMembershipNumber(): string
+    {
+        return $this->membershipNumber;
+    }
+
+    public function getPoints(): int
+    {
+        return $this->points;
+    }
+
     public function setName(string $name): void
     {
         $this->name = $name;
@@ -70,6 +101,16 @@ class CustomerModel
     public function setAddress(string $address): void
     {
         $this->address = $address;
+    }
+
+    public function setMembershipNumber(string $membershipNumber): void
+    {
+        $this->membershipNumber = $membershipNumber;
+    }
+
+    public function setPoints(int $points): void
+    {
+        $this->points = $points;
     }
 
     public function getCreatedAt(): ?string
@@ -171,6 +212,9 @@ class CustomerModel
             'address' => $this->address,
             'created_at' => $this->createdAt,
             'password_hash' => $this->passwordHash,
+            'is_admin' => $this->isAdmin,
+            'membership_number' => $this->membershipNumber,
+            'points' => $this->points,
         ]);
 
         if ($created === null) {
@@ -203,6 +247,9 @@ class CustomerModel
             'address' => $this->address,
             'created_at' => $this->createdAt,
             'password_hash' => $this->passwordHash,
+            'is_admin' => $this->isAdmin,
+            'membership_number' => $this->membershipNumber,
+            'points' => $this->points,
         ]);
     }
 
@@ -228,7 +275,9 @@ class CustomerModel
             $data['address'],
             $data['created_at'],
             $data['password_hash'] ?? '',
-            (bool) ($data['is_admin'] ?? false)
+            (bool) ($data['is_admin'] ?? false),
+            (string) ($data['membership_number'] ?? ''),
+            (int) ($data['points'] ?? 0)
         );
     }
 
@@ -240,7 +289,10 @@ class CustomerModel
             'email' => $this->email,
             'phone' => $this->phone,
             'address' => $this->address,
-            'createdAt' => $this->createdAt,
+            'created_at' => $this->createdAt,
+            'is_admin' => $this->isAdmin,
+            'membership_number' => $this->membershipNumber,
+            'points' => $this->points,
         ];
     }
 
