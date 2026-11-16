@@ -246,6 +246,7 @@
     "Please enter your email address.": "Saisissez votre adresse courriel.",
     "This email address does not look valid. Example: name@example.com": "Cette adresse courriel semble invalide. Exemple : nom@exemple.com",
     "Email cannot be longer than 100 characters.": "L\u2019adresse courriel ne peut pas d\u00e9passer 100 caract\u00e8res.",
+    "Phone number must be 7 to 15 digits.": "Le num\u00e9ro de t\u00e9l\u00e9phone doit contenir de 7 \u00e0 15 chiffres.",
     "Please enter a phone number.": "Saisissez un num\u00e9ro de t\u00e9l\u00e9phone.",
     "Phone number must be 7 to 15 digits (spaces, dashes and brackets are allowed).": "Le num\u00e9ro doit contenir de 7 \u00e0 15 chiffres. Les espaces, tirets et parenth\u00e8ses sont permis.",
     "Please enter an address.": "Saisissez une adresse.",

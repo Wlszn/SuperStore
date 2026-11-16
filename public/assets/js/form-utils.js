@@ -76,6 +76,31 @@ function wireShowPasswordToggle(checkboxId, passwordInputIds) {
     });
 }
 
+function wirePhoneNumberInput(input) {
+    input.addEventListener('input', () => {
+        const digitsBeforeCursor = input.value.slice(0, input.selectionStart).replace(/\D/g, '').length;
+        const digits = input.value.replace(/\D/g, '').slice(0, 15);
+        const groups = digits.length === 11 && digits.startsWith('1')
+            ? [digits.slice(0, 1), digits.slice(1, 4), digits.slice(4, 7), digits.slice(7)]
+            : [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 10), digits.slice(10)];
+        const formatted = groups.filter(Boolean).join(' ');
+        if (input.value === formatted) return;
+
+        input.value = formatted;
+        let cursor = 0;
+        let remaining = digitsBeforeCursor;
+        while (cursor < formatted.length && remaining > 0) {
+            if (formatted[cursor] !== ' ') remaining--;
+            cursor++;
+        }
+        input.setSelectionRange(cursor, cursor);
+    });
+
+    input.form.addEventListener('formdata', event => {
+        event.formData.set(input.name, input.value.replace(/\D/g, ''));
+    });
+}
+
 /**
  * Checks name, email, phone and address in the browser before sending.
  * Returns an errors object (empty when everything is valid).
@@ -86,7 +111,7 @@ function validateCustomerFields(form) {
 
     const name = fields['name'].value.trim();
     const email = fields['email'].value.trim();
-    const phone = fields['phone'].value.trim();
+    const phone = fields['phone'].value.replace(/ /g, '');
     const address = fields['address'].value.trim();
 
     if (name === '') {
@@ -107,8 +132,8 @@ function validateCustomerFields(form) {
 
     if (phone === '') {
         errors.phone = 'Please enter a phone number.';
-    } else if (!/^[0-9+\-() ]{7,15}$/.test(phone)) {
-        errors.phone = 'Phone number must be 7 to 15 digits (spaces, dashes and brackets are allowed).';
+    } else if (!/^[0-9]{7,15}$/.test(phone)) {
+        errors.phone = 'Phone number must be 7 to 15 digits.';
     }
 
     if (address === '') {

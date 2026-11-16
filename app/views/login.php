@@ -18,7 +18,7 @@ if (isset($_SESSION['customer_id'])) {
 <script src="/assets/js/language.js" defer></script>
 </head>
 
-<body>
+<body class="auth-page">
 
 <div class="container">
     <div class="language-control"><button type="button" id="language-switch" aria-label="Passer au fran&#231;ais">FR</button></div>

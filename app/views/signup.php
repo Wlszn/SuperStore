@@ -18,7 +18,7 @@ if (isset($_SESSION['customer_id'])) {
 <script src="/assets/js/language.js" defer></script>
 </head>
 
-<body>
+<body class="auth-page">
 
 <div class="container">
     <div class="language-control"><button type="button" id="language-switch" aria-label="Passer au fran&#231;ais">FR</button></div>
@@ -62,7 +62,7 @@ if (isset($_SESSION['customer_id'])) {
                 type="tel"
                 id="phone"
                 name="phone"
-                maxlength="15"
+                inputmode="numeric"
                 autocomplete="tel"
                 required
             >
@@ -130,6 +130,7 @@ if (isset($_SESSION['customer_id'])) {
     const submitBtn = document.getElementById('submitBtn');
 
     wireShowPasswordToggle('showPassword', ['password', 'confirm_password']);
+    wirePhoneNumberInput(form.elements.phone);
 
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
