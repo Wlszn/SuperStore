@@ -7,7 +7,6 @@ session_start();
 date_default_timezone_set('America/Toronto');
 
 use App\Controllers\AuthController;
-use App\Controllers\BarcodeController;
 use App\Controllers\ThresholdController;
 use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
@@ -49,7 +48,6 @@ function view(string $name): void
 
 $routes = [
     'POST /account/membership' => [App\Controllers\CheckoutController::class, 'membership'],
-    'GET /order-confirmation' => fn() => view('order-confirmation'),
     'GET /checkout' => [App\Controllers\CheckoutController::class, 'index'],
     'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
     'GET /api/members/lookup' => [App\Controllers\CheckoutController::class, 'memberLookup'],
@@ -90,7 +88,6 @@ $routes = [
     // Phase 3: scanners (used by management and self-checkout)
     'GET /api/products/lookup' => [ProductController::class, 'lookup'],
     'POST /api/scans'          => [ScanApiController::class, 'store'],
-    'POST /api/barcode'       => [BarcodeController::class, 'processBarcode'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
 ];
 

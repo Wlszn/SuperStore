@@ -63,12 +63,8 @@ BEGIN
     RETURN to_jsonb(receipt);
 END $$;
 
-CREATE OR REPLACE FUNCTION complete_checkout(p_key text, p_customer integer, p_items jsonb)
-RETURNS jsonb LANGUAGE sql SET search_path = public AS $$
-    SELECT complete_checkout(p_key, p_customer, p_items, 0);
-$$;
+-- Older 3-argument version: the website now always sends p_redeem_points (0 when no points are used).
+DROP FUNCTION IF EXISTS complete_checkout(text,integer,jsonb);
 REVOKE ALL ON FUNCTION complete_checkout(text,integer,jsonb,integer) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION complete_checkout(text,integer,jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION complete_checkout(text,integer,jsonb,integer) TO service_role;
-GRANT EXECUTE ON FUNCTION complete_checkout(text,integer,jsonb) TO service_role;
 COMMIT;

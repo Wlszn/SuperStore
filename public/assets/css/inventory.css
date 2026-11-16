@@ -347,9 +347,6 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
 .order-link { min-height: 32px; font-size: 12px; }
 .order-status { display: inline-block; padding: 4px 8px; border-radius: 6px; background: var(--blue-wash); color: var(--blue); white-space: nowrap; }
 .order-status.is-delivered { background: #edf5ef; color: #306346; }
-.order-list { list-style: none; padding: 0; margin: 0; }
-.order-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 9px 0; }
-.order-list li + li { border-top: 1px solid var(--line); }
 
 
 .toast {

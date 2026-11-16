@@ -98,7 +98,7 @@ class CheckoutController
         }
 
         try {
-            $customerId = isset($_POST['membership']) ? ($_SESSION['customer_id'] ?? null) : null;
+            $customerId = null; // guest unless a membership card is entered
             $membership = trim(is_string($_POST['membership_code'] ?? null) ? $_POST['membership_code'] : '');
             if ($membership !== '') {
                 $members = SupaClient::rows('GET', 'customers', [
@@ -113,31 +113,24 @@ class CheckoutController
                 }
                 $customerId = $members[0]['id'];
             }
-            $payload = [
+            if ($points > 0 && (!isset($_SESSION['customer_id']) || (int) $customerId !== (int) $_SESSION['customer_id'])) {
+                jsonResponse(403, ['status' => 'error', 'message' => 'Use your own membership to spend points.']);
+                return;
+            }
+            // One call does everything in a single transaction: stock check, receipt, points earned and spent.
+            [$status, $receipt] = supa_request('POST', 'rpc/complete_checkout', null, [
                 'p_key' => $key,
                 'p_customer' => $customerId,
                 'p_items' => $items,
-            ];
-            if ($points > 0) {
-                if (!isset($_SESSION['customer_id']) || (int) $customerId !== (int) $_SESSION['customer_id']) {
-                    jsonResponse(403, ['status' => 'error', 'message' => 'Use your own membership to spend points.']);
-                    return;
-                }
-                $payload['p_redeem_points'] = $points;
-                [$status, $receipt] = supa_request('POST', 'rpc/complete_checkout', null, $payload);
-                if (($receipt['code'] ?? '') === 'PGRST202') {
-                    jsonResponse(503, ['status' => 'error', 'message' => 'Points discounts are not available yet. Clear the points field to continue.']);
-                    return;
-                }
-                if ($status === 422 && ($receipt['code'] ?? '') === 'PT422') {
-                    jsonResponse(422, ['status' => 'error', 'message' => $receipt['message']]);
-                    return;
-                }
-                if ($status < 200 || $status >= 300 || !isset($receipt['id'])) {
-                    throw new RuntimeException('Checkout failed.');
-                }
-            } else {
-                $receipt = SupaClient::rows('POST', 'rpc/complete_checkout', null, $payload);
+                'p_redeem_points' => $points,
+            ]);
+            // PT422 is raised by complete_checkout() for a points problem the customer can fix.
+            if ($status === 422 && ($receipt['code'] ?? '') === 'PT422') {
+                jsonResponse(422, ['status' => 'error', 'message' => $receipt['message']]);
+                return;
+            }
+            if ($status < 200 || $status >= 300 || !isset($receipt['id'])) {
+                throw new RuntimeException('Checkout failed.');
             }
             if ($method === 'cash') {
                 // 'card' is the column default. The purchase is already saved, so a failure here

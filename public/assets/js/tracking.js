@@ -15,37 +15,11 @@
     }
 
     function updateHistory() {
-        const orderList = document.getElementById('sample-order-list');
-        if (orderList) {
-            let orders = [];
-            try {
-                orders = JSON.parse(sessionStorage.getItem('superstore.orders.' + document.body.dataset.orderOwner)) || [];
-            } catch {}
-            orderList.replaceChildren();
-            for (const order of orders) {
-                const row = document.createElement('li');
-                const reference = document.createElement('strong');
-                reference.textContent = order.reference;
-                const estimate = document.createElement('time');
-                estimate.textContent = order.estimate;
-                const status = document.createElement('span');
-                status.className = 'order-status';
-                status.dataset.orderStatus = order.reference;
-                status.dataset.pickup = String(order.delivery === 'pickup');
-                const link = document.createElement('a');
-                link.className = 'button order-link';
-                link.href = '/order-confirmation?order=' + encodeURIComponent(order.reference) + '#tracking';
-                window.setLocalizedText(link, 'Track order');
-                row.append(reference, estimate, status, link);
-                orderList.append(row);
-            }
-            document.getElementById('sample-orders').hidden = !orders.length;
-        }
-
         for (const badge of document.querySelectorAll('[data-order-status]')) {
             // In-store purchases have no delivery: show them as completed, without tracking.
             const trackingLink = badge.closest('tr')?.querySelector('.tracking-link');
-            if (!readFulfillment(badge.dataset.orderStatus) && badge.dataset.pickup === undefined) {
+            const fulfillment = readFulfillment(badge.dataset.orderStatus);
+            if (!fulfillment) {
                 if (trackingLink) trackingLink.hidden = true;
                 badge.classList.add('is-delivered');
                 window.setLocalizedText(badge, 'Completed');
@@ -53,7 +27,7 @@
             }
             if (trackingLink) trackingLink.hidden = false;
             const delivered = readStage(badge.dataset.orderStatus) === 3;
-            const pickup = badge.dataset.pickup === 'true' || readFulfillment(badge.dataset.orderStatus)?.delivery === 'pickup';
+            const pickup = fulfillment.delivery === 'pickup';
             badge.classList.toggle('is-delivered', delivered);
             window.setLocalizedText(badge, delivered
                 ? (pickup ? 'Collected' : 'Delivered')
@@ -73,7 +47,7 @@
     const reference = tracking.dataset.orderReference;
     let currentStep = readStage(reference);
     const fulfillment = readFulfillment(reference);
-    if (!fulfillment && !document.getElementById('order-confirmation')) {
+    if (!fulfillment) {
         tracking.hidden = true;
         return;
     }

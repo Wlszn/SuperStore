@@ -14,7 +14,7 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
     <script src="/assets/js/notifications.js" defer></script>
     <script src="/assets/js/inventory.js" defer></script>
 </head>
-<body data-order-owner="<?= $e($_SESSION['customer_id'] ?? 'guest') ?>">
+<body>
 <div class="workspace">
     <aside class="sidebar">
         <a class="brand" href="/products"><span class="brand-icon" aria-hidden="true">S</span>SuperStore</a>
