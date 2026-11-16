@@ -56,7 +56,6 @@ ALTER TABLE customers
                                 DEFAULT ('SS' || nextval('membership_number_seq')),
   ADD COLUMN points           INT NOT NULL DEFAULT 0 CHECK (points >= 0);
 
--- Each product is defined once...
 CREATE TABLE products (
   id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name        VARCHAR(100)  NOT NULL,
@@ -70,7 +69,7 @@ CREATE TABLE products (
   CHECK (upc IS NOT NULL OR epc IS NOT NULL)
 );
 
--- ...but received many times (one product -> many receptions).
+--one product -> many receptions
 CREATE TABLE receptions (
   id           INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   product_id   INT  NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -79,8 +78,6 @@ CREATE TABLE receptions (
 );
 CREATE INDEX idx_receptions_product ON receptions (product_id);
 
--- One checkout = one purchase (the receipt). customer_id is NULL for a
--- guest who skipped the membership card.
 CREATE TABLE purchases (
   id             INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   customer_id    INT REFERENCES customers(id) ON DELETE SET NULL,
@@ -90,9 +87,7 @@ CREATE TABLE purchases (
 );
 CREATE INDEX idx_purchases_customer ON purchases (customer_id, purchased_at);
 
-
-  -- The lines of a receipt. Name and price are copied at checkout time so
--- old receipts stay correct after a product is edited or deleted.
+-- The lines of a receipt. Name and price are copied at checkout time
 CREATE TABLE purchase_items (
   id           INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   purchase_id  INT NOT NULL REFERENCES purchases(id) ON DELETE CASCADE,
@@ -104,15 +99,13 @@ CREATE TABLE purchase_items (
 CREATE INDEX idx_purchase_items_purchase ON purchase_items (purchase_id);
 CREATE INDEX idx_purchase_items_product  ON purchase_items (product_id);
 
--- Tags read by the RFID reader (scripts/rfid.py posts them to /api/scans).
--- The product form and the checkout page pick them up from here.
+-- Tags read by the RFID reader 
 CREATE TABLE rfid_scans (
   id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   epc         VARCHAR(24) NOT NULL,
   scanned_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Stock is computed, never stored: everything received minus everything sold.
 CREATE VIEW product_stock WITH (security_invoker = true) AS
 SELECT p.*,
        ( COALESCE((SELECT SUM(r.quantity) FROM receptions r     WHERE r.product_id = p.id), 0)
@@ -126,9 +119,9 @@ ALTER TABLE purchases      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rfid_scans     ENABLE ROW LEVEL SECURITY;
 
--- Demo data. Replace the EPCs with the ones printed on your own tags.
+-- Demo data. Replace the EPCs with the ones printed on the tags.
 INSERT INTO products (name, category, price, upc, epc, producer) VALUES
-  ('Coca-Cola 500ml',      'Beverage', 2.49, '0067000004114', 'E28011700000020A1B2C3D01', 'The Coca-Cola Company'),
+  ('Coca-Cola 500ml',      'Beverage', 2.49, '0067000004117', 'E28011700000020A1B2C3D01', 'The Coca-Cola Company'),
   ('Lay''s Classic 235g',  'Snacks',   4.99, '0060410013304', 'E28011700000020A1B2C3D02', 'Frito-Lay'),
   ('Natrel 2% Milk 2L',    'Dairy',    5.29, '0068700011054', 'E28011700000020A1B2C3D03', 'Natrel');
 
@@ -137,5 +130,3 @@ INSERT INTO receptions (product_id, quantity, received_at) VALUES
   (2, 10, CURRENT_DATE - 3),
   (3,  4, CURRENT_DATE);
 
--- Make your own account an admin (change the email):
--- UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
