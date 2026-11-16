@@ -14,13 +14,13 @@ class ReceptionModel
     private const MAX_QUANTITY = 100000;
 
     /** Every reception of one product, newest first. */
-    public function forProduct(int $productId): array
+    public function forProduct(int $productId, ?int $limit = null): array
     {
         $rows = SupaClient::rows('GET', self::TABLE, [
             'select' => self::COLUMNS,
             'product_id' => 'eq.' . $productId,
             'order' => 'received_at.desc,id.desc',
-        ]);
+        ] + ($limit === null ? [] : ['limit' => $limit]));
 
         return array_map([$this, 'normalize'], $rows);
     }

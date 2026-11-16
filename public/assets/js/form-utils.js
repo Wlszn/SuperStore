@@ -9,7 +9,7 @@ async function postForm(action, form) {
 /** Removes every error message and red border from a form. */
 function clearFormErrors(form) {
     form.querySelectorAll('.field-error').forEach(function (el) {
-        el.textContent = '';
+        window.setLocalizedText(el, '');
     });
     form.querySelectorAll('.invalid').forEach(function (el) {
         el.classList.remove('invalid');
@@ -32,7 +32,7 @@ function showFormErrors(form, errors) {
             }
         }
         if (errorSlot) {
-            errorSlot.textContent = fieldMessage;
+            window.setLocalizedText(errorSlot, fieldMessage);
         }
     });
 
@@ -43,7 +43,7 @@ function showFormErrors(form, errors) {
 
 /** Shows the green (success) or red (error) message box above the form. */
 function showMessage(messageEl, text, isSuccess) {
-    messageEl.textContent = text;
+    window.setLocalizedText(messageEl, text);
     messageEl.className = 'form-message ' + (isSuccess ? 'success' : 'error');
     messageEl.hidden = false;
 }
@@ -51,7 +51,7 @@ function showMessage(messageEl, text, isSuccess) {
 /** Hides the message box again (called before every new submit). */
 function hideMessage(messageEl) {
     messageEl.hidden = true;
-    messageEl.textContent = '';
+    window.setLocalizedText(messageEl, '');
     messageEl.className = 'form-message';
 }
 

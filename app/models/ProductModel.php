@@ -40,22 +40,20 @@ class ProductModel
     }
 
     /** The product whose UPC (barcode) or EPC (RFID tag) matches a scan, or null. */
-    public function findByCode(string $code): ?array
+    public function findByCode(string $code, bool $epcOnly = false): ?array
     {
-        $code = strtoupper(str_replace(' ', '', trim($code)));
-
-        // Codes are only digits/hex letters; anything else can't match and
-        // would break the `or=(...)` filter syntax.
-        if ($code === '' || !ctype_alnum($code)) {
+        $code = trim($code);
+        if ($code === '' || strlen($code) > 24 || preg_match('/[\x00-\x1F\x7F]/', $code)) {
             return null;
         }
-
-        $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
-            'select' => self::COLUMNS,
-            'or' => sprintf('(upc.eq.%1$s,epc.eq.%1$s)', $code),
-            'limit' => 1,
+        $rows = $epcOnly ? [] : SupaClient::rows('GET', self::STOCK_VIEW, [
+            'select' => self::COLUMNS, 'upc' => 'eq.' . $code, 'limit' => 1,
         ]);
-
+        if (!$rows && preg_match('/^[0-9a-fA-F]{1,24}$/D', $code)) {
+            $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
+                'select' => self::COLUMNS, 'epc' => 'eq.' . strtoupper($code), 'limit' => 1,
+            ]);
+        }
         return $rows ? $this->normalize($rows[0]) : null;
     }
 
@@ -109,14 +107,14 @@ class ProductModel
         }
 
         // Scanners and readers may add spaces; EPCs are hex, so compare in uppercase.
-        $upc = str_replace(' ', '', trim((string) ($input['upc'] ?? '')));
+        $upc = trim((string) ($input['upc'] ?? ''));
         $epc = strtoupper(str_replace(' ', '', trim((string) ($input['epc'] ?? ''))));
 
         if ($upc === '' && $epc === '') {
             $errors['upc'] = 'Enter a UPC or an EPC so the product can be scanned.';
         }
-        if ($upc !== '' && !preg_match('/^\d{8,13}$/', $upc)) {
-            $errors['upc'] = 'The UPC must be 8 to 13 digits.';
+        if ($upc !== '' && (mb_strlen($upc) > 13 || preg_match('/[\x00-\x1F\x7F]/', $upc))) {
+            $errors['upc'] = 'The barcode must contain 1 to 13 printable characters.';
         }
         if ($epc !== '' && !preg_match('/^[0-9A-F]{1,24}$/', $epc)) {
             $errors['epc'] = 'The EPC must be up to 24 hexadecimal characters (0-9, A-F).';

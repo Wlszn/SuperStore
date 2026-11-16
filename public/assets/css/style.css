@@ -167,3 +167,11 @@ input.invalid { border-color: #b13c2e; }
     .fan-action button { padding: 10px 13px; }
     .container { padding: 25px 21px; }
 }
+
+@media (max-width: 540px) {
+    .container { margin-block: 24px; padding: clamp(16px, 6vw, 30px); }
+    .dashboard-nav { flex-wrap: wrap; }
+}
+
+.language-control { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.container #language-switch, .dashboard-nav #language-switch { width: auto; min-width: 44px; padding: 6px 10px; }

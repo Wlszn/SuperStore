@@ -119,6 +119,27 @@ class ProductController
         ]);
     }
 
+    public function latestReception(): void
+    {
+        if (empty($_SESSION['customer_id']) || empty($_SESSION['is_admin'])) {
+            jsonResponse(403, ['status' => 'error']);
+            return;
+        }
+
+        $id = $this->id($_GET);
+        if ($id === null) {
+            jsonResponse(422, ['status' => 'error']);
+            return;
+        }
+
+        try {
+            $reception = $this->receptions->forProduct($id, 1)[0] ?? null;
+            jsonResponse(200, ['status' => 'success', 'reception' => $reception]);
+        } catch (RuntimeException $e) {
+            $this->serverError();
+        }
+    }
+
     // POST /products: register a new product
     public function store(): void
     {
@@ -261,7 +282,7 @@ class ProductController
         }
 
         try {
-            $product = $this->products->findByCode($code);
+            $product = $this->products->findByCode($code, ($_GET['type'] ?? '') === 'epc');
         } catch (RuntimeException $e) {
             $this->serverError();
             return;

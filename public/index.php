@@ -24,7 +24,7 @@ spl_autoload_register(function (string $class): void {
 
     $parts = explode('\\', substr($class, strlen($prefix)));
     $file = array_pop($parts);
-    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : ''; 
+    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : '';
 
     $path = APP_ROOT . '/app/' . $dir . $file . '.php';
     if (is_file($path)) {
@@ -47,6 +47,11 @@ function view(string $name): void
 }
 
 $routes = [
+    'POST /account/membership' => [App\Controllers\CheckoutController::class, 'membership'],
+    'GET /checkout' => [App\Controllers\CheckoutController::class, 'index'],
+    'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
+    'GET /account' => [App\Controllers\CheckoutController::class, 'account'],
+    'GET /receipt' => [App\Controllers\CheckoutController::class, 'receipt'],
     'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? '/dashboard' : '/login')),
 
     'GET /login' => fn() => view('login'),
@@ -76,6 +81,7 @@ $routes = [
     'POST /products'         => [ProductController::class, 'store'],
     'POST /products/update'  => [ProductController::class, 'update'],
     'POST /products/delete'  => [ProductController::class, 'delete'],
+    'GET /api/receptions/latest' => [ProductController::class, 'latestReception'],
     'POST /receptions'       => [ProductController::class, 'receive'],
 
     // Phase 3: scanners (used by management and self-checkout)

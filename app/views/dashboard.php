@@ -12,7 +12,7 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SuperStore - Dashboard</title>
+    <title data-i18n>SuperStore - Dashboard</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
         .dashboard-shell { max-width: 1100px; margin: 0 auto; }
@@ -58,21 +58,26 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
             .fridge-photo { height: 125px; }
         }
     </style>
+    <script src="/assets/js/language.js" defer></script>
 </head>
 <body>
 <div class="dashboard-shell">
     <header class="dashboard-header">
         <div>
-            <h1>Store dashboard</h1>
-            <p>Welcome, <?= htmlspecialchars($customerName, ENT_QUOTES) ?>. Live refrigerator status.</p>
+            <h1><span data-i18n>Store dashboard</span></h1>
+            <p><span data-i18n>Welcome,</span> <?= htmlspecialchars($customerName, ENT_QUOTES) ?>. Live refrigerator status.</p>
         </div>
-        <nav class="dashboard-nav" aria-label="Dashboard navigation">
-            <a href="/thresholds">Thresholds</a>
-            <a href="/logout">Sign out</a>
+        <nav class="dashboard-nav" aria-label="Dashboard navigation" data-i18n-aria-label="Dashboard navigation">
+            <?php if (!empty($_SESSION['is_admin'])): ?>
+                <a href="/products"><span data-i18n>Products</span></a>
+            <?php endif; ?>
+            <a href="/thresholds"><span data-i18n>Thresholds</span></a>
+            <a href="/logout"><span data-i18n>Sign out</span></a>
+            <button type="button" id="language-switch" aria-label="Passer au fran&#231;ais">FR</button>
         </nav>
     </header>
 
-    <div id="dashboardStatus" class="dashboard-status" role="status">Connecting to sensors...</div>
+    <div id="dashboardStatus" class="dashboard-status" role="status"><span data-i18n>Connecting to sensors...</span></div>
     <div id="alertBanner" class="alert-banner" role="alert"></div>
 
     <main class="fridge-grid">
@@ -90,26 +95,26 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
                 <img class="fridge-photo" src="<?= htmlspecialchars($fridgePhotos[$fridge], ENT_QUOTES) ?>" alt="Refrigerator <?= $fridge ?> storage area" onerror="this.onerror=null; this.src='https://commons.wikimedia.org/wiki/Special:FilePath/Refrigerator.jpg';">
                 <div class="fridge-content">
                     <div class="fridge-heading">
-                        <h2 id="fridge-<?= $fridge ?>-title">Refrigerator <?= $fridge ?></h2>
-                        <span class="threshold" id="threshold-<?= $fridge ?>">Limit: -- °C</span>
+                        <h2 id="fridge-<?= $fridge ?>-title"><span data-i18n>Refrigerator</span> <?= $fridge ?></h2>
+                        <span class="threshold" id="threshold-<?= $fridge ?>"><span data-i18n>Limit: -- °C</span></span>
                     </div>
                     <div class="gauge-grid">
                         <div class="gauge temperature">
                             <div class="gauge-dial" id="temp-dial-<?= $fridge ?>"><strong class="gauge-reading" id="temp-<?= $fridge ?>">-- °C</strong></div>
-                            <span class="gauge-label">Temperature</span>
+                            <span class="gauge-label"><span data-i18n>Temperature</span></span>
                         </div>
                         <div class="gauge humidity">
                             <div class="gauge-dial" id="humidity-dial-<?= $fridge ?>"><strong class="gauge-reading" id="humidity-<?= $fridge ?>">-- %</strong></div>
-                            <span class="gauge-label">Humidity</span>
+                            <span class="gauge-label"><span data-i18n>Humidity</span></span>
                         </div>
                     </div>
                     <div class="temperature-state" id="temperature-state-<?= $fridge ?>">
-                        <img id="temperature-state-image-<?= $fridge ?>" src="https://m.media-amazon.com/images/I/71kNnoNhufL.jpg" alt="Temperature status">
-                        <span id="temperature-state-label-<?= $fridge ?>">Waiting for temperature...</span>
+                        <img id="temperature-state-image-<?= $fridge ?>" src="https://m.media-amazon.com/images/I/71kNnoNhufL.jpg" alt="Temperature status" data-i18n-alt="Temperature status">
+                        <span id="temperature-state-label-<?= $fridge ?>"><span data-i18n>Waiting for temperature...</span></span>
                     </div>
                 <div class="fan-row">
-                    <span class="fan-label"><img class="fan-icon" src="https://guide-images.cdn.ifixit.com/igi/JoJrZQCOY5QF6Vkr.full" alt="Fan"> Fan status</span>
-                    <strong id="fan-<?= $fridge ?>" class="fan-off">OFF</strong>
+                    <span class="fan-label"><img class="fan-icon" src="https://guide-images.cdn.ifixit.com/igi/JoJrZQCOY5QF6Vkr.full" alt="Fan" data-i18n-alt="Fan"> <span data-i18n>Fan status</span></span>
+                    <strong id="fan-<?= $fridge ?>" class="fan-off"><span data-i18n>OFF</span></strong>
                 </div>
                 </div>
             </section>
@@ -131,7 +136,7 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
     function setThreshold(id, threshold) {
         var element = document.getElementById(id);
         if (element && threshold !== null && threshold !== undefined) {
-            element.textContent = 'Limit: ' + Number(threshold).toFixed(1) + ' °C';
+            window.setLocalizedText(element, 'Limit: ' + Number(threshold).toFixed(1) + ' °C');
         }
     }
 
@@ -155,8 +160,9 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
 
         state.className = 'temperature-state ' + stateName;
         image.src = stateImage;
-        image.alt = stateText;
-        label.textContent = stateText;
+        image.dataset.i18nAlt = stateText;
+        image.alt = window.translate(stateText);
+        window.setLocalizedText(label, stateText);
     }
 
     function setValue(id, value, suffix) {
@@ -169,7 +175,7 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
     function setFan(id, isOn) {
         var element = document.getElementById(id);
         if (!element) return;
-        element.textContent = isOn ? 'ON' : 'OFF';
+        window.setLocalizedText(element, isOn ? 'ON' : 'OFF');
         element.className = isOn ? 'fan-on' : 'fan-off';
     }
 
@@ -219,12 +225,12 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
                 setFan('fan-' + fridge, isFanOn);
             });
 
-            status.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+            window.setLocalizedText(status, 'Last updated: ' + new Date().toLocaleTimeString());
             status.className = 'dashboard-status';
-            alertBanner.textContent = alerts.length ? alerts.join(' ') : 'Temperature status is normal. No active alerts.';
+            window.setLocalizedText(alertBanner, alerts.length ? alerts.join(' ') : 'Temperature status is normal. No active alerts.');
             alertBanner.className = alerts.length ? 'alert-banner visible' : 'alert-banner';
         } catch (error) {
-            status.textContent = 'Sensor data is temporarily unavailable. Retrying...';
+            window.setLocalizedText(status, 'Sensor data is temporarily unavailable. Retrying...');
             status.className = 'dashboard-status error';
         }
     }
@@ -232,7 +238,7 @@ $customerName = $_SESSION['customer_name'] ?? 'there';
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
-    loadDashboard();
+    window.addEventListener('DOMContentLoaded', loadDashboard);
     setInterval(loadDashboard, 10000);
 </script>
 </body>

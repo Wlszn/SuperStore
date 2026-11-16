@@ -14,7 +14,7 @@ SuperStore simulates a physical store where sensors, actuators and single-board 
 
 The store has two sides:
 
-- **Management side**: a dashboard for fridges, products and inventory (admins only).
+- **Management side**: a dashboard for fridges, products and inventory (product management is admin-only).
 - **Customer side**: account creation and a self-checkout station where customers scan and pay on their own.
 
 ## Tech Stack
@@ -202,7 +202,7 @@ Thresholds are stored per fridge in the database and edited on the **Thresholds*
 
 ### Pages (admin only)
 
-Each page receives the variables listed, plus `$csrfToken`. Until a view file exists, the route answers with that data as JSON (HTTP 501), so the backend can be tested on its own.
+Sign in as an administrator and open **Products** from your account or the store dashboard. Each page receives the variables listed, plus `$csrfToken`.
 
 | Route | View | Variables |
 |---|---|---|
@@ -226,14 +226,14 @@ Send with `postForm()` from `form-utils.js`. Every form includes `csrf_token`.
 | `POST /products/delete` | `id` |
 | `POST /receptions` | `product_id, quantity, received_at` (`YYYY-MM-DD`, empty = today) |
 
-Every answer has the same shape, ready for `showMessage()` and `showFormErrors()`:
+The response includes a status and message. Validation errors are keyed by field name:
 
 ```json
 {"status": "success", "message": "Product \"Coca-Cola 500ml\" added successfully.", "product": {...}}
 {"status": "error", "message": "Please fix the highlighted fields and try again.", "errors": {"upc": "Another product already uses this UPC."}}
 ```
 
-Error slots in the form: `<span class="field-error" id="error-upc"></span>` (one per field name).
+Error slots in the form: `<span class="field-error" data-error="upc"></span>` (one per field name).
 
 ### Scanner APIs (no login, shared with self-checkout)
 
@@ -244,8 +244,8 @@ Error slots in the form: `<span class="field-error" id="error-upc"></span>` (one
 | `GET /api/scans/latest` | The newest scan. Remember its `last_id`. |
 | `GET /api/scans/latest?after=12` | Every scan newer than 12, oldest first, plus the new `last_id`. Poll every second. |
 
-- **Barcode scanner:** it types like a keyboard, so it fills the focused UPC field with no code needed.
-- **RFID on the product form:** poll `/api/scans/latest?after=<last_id>` and put the newest `epc` into the EPC field.
+- **Barcode scanner:** use USB keyboard mode with an Enter suffix. In **Products**, choose **Scan barcode** to open a matching product, or start a new one with the UPC prefilled. In **Receive stock**, scan to select the product before recording the quantity and date. In the product form, focus **Barcode (UPC)** and scan to fill the field. You can also type any UPC manually.
+- **Planned RFID reader capture for the product form:** poll `/api/scans/latest?after=<last_id>` and put the newest `epc` into the EPC field.
 
 ### RFID reader setup (Raspberry Pi)
 

@@ -81,7 +81,7 @@ class AuthController
         echo json_encode([
             'status' => 'success',
             'message' => 'Your account was created. Taking you to your dashboard...',
-            'redirect' => '/dashboard',
+            'redirect' => empty($_SESSION['is_admin']) ? '/account' : '/dashboard',
         ]);
     }
 
@@ -142,7 +142,7 @@ class AuthController
         echo json_encode([
             'status' => 'success',
             'message' => 'Welcome back, ' . $customer->getName() . '! Signing you in...',
-            'redirect' => '/dashboard',
+            'redirect' => empty($_SESSION['is_admin']) ? '/account' : '/dashboard',
         ]);
     }
 
@@ -166,6 +166,9 @@ class AuthController
 
     private function triggerGPIO(string $result): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            return;
+        }
         $script = escapeshellarg(self::GPIO_SCRIPT);
         $resultArg = escapeshellarg($result);
         shell_exec("python3 {$script} {$resultArg} > /dev/null 2>&1 &");

@@ -224,8 +224,8 @@ class CustomerModel
             (int) $data['id'],
             $data['name'],
             $data['email'],
-            $data['phone'],
-            $data['address'],
+            $data['phone'] ?? '',
+            $data['address'] ?? '',
             $data['created_at'],
             $data['password_hash'] ?? '',
             (bool) ($data['is_admin'] ?? false)
