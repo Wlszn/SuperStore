@@ -262,7 +262,7 @@
     "The email or password you entered is incorrect. Please try again.": "L\u2019adresse courriel ou le mot de passe est incorrect. R\u00e9essayez.",
     "This account was created before passwords existed. Please create a new account.": "Ce compte a \u00e9t\u00e9 cr\u00e9\u00e9 avant l\u2019ajout des mots de passe. Cr\u00e9ez un nouveau compte.",
     "Something went wrong on our side while creating your account. Please try again.": "Une erreur est survenue lors de la cr\u00e9ation du compte. R\u00e9essayez.",
-    "Your account was created. Taking you to your dashboard...": "Votre compte a \u00e9t\u00e9 cr\u00e9\u00e9. Redirection\u2026",
+    "Your account was created. Taking you to your account...": "Votre compte a \u00e9t\u00e9 cr\u00e9\u00e9. Redirection\u2026",
     "Welcome back, {0}! Signing you in...": "Bon retour, {0}! Connexion\u2026",
     "Please sign in first.": "Connectez-vous d\u2019abord.",
     "Only store administrators can manage products.": "Seuls les administrateurs peuvent g\u00e9rer les produits.",

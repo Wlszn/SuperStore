@@ -1,7 +1,7 @@
 <?php
 
 if (isset($_SESSION['customer_id'])) {
-    header('Location: /dashboard');
+    header('Location: ' . (empty($_SESSION['is_admin']) ? '/account' : '/products'));
     exit;
 }
 ?>
@@ -113,7 +113,7 @@ if (isset($_SESSION['customer_id'])) {
 
             if (data.status === 'success') {
                 showMessage(message, data.message, true);
-                window.location.href = data.redirect || '/dashboard';
+                window.location.href = data.redirect || '/';
             } else {
                 showFormErrors(form, data.errors || {});
                 showMessage(message, data.message, false);

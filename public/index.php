@@ -53,11 +53,11 @@ $routes = [
     'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
     'GET /account' => [App\Controllers\CheckoutController::class, 'account'],
     'GET /receipt' => [App\Controllers\CheckoutController::class, 'receipt'],
-    'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? '/dashboard' : '/login')),
+    'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? (empty($_SESSION['is_admin']) ? '/account' : '/products') : '/login')),
 
     'GET /login' => fn() => view('login'),
     'GET /signup' => fn() => view('signup'),
-    'GET /dashboard' => fn() => view('dashboard'),
+    'GET /dashboard' => fn() => header('Location: /'),
 
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],

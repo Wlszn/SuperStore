@@ -80,8 +80,8 @@ class AuthController
         http_response_code(201);
         echo json_encode([
             'status' => 'success',
-            'message' => 'Your account was created. Taking you to your dashboard...',
-            'redirect' => empty($_SESSION['is_admin']) ? '/account' : '/dashboard',
+            'message' => 'Your account was created. Taking you to your account...',
+            'redirect' => empty($_SESSION['is_admin']) ? '/account' : '/products',
         ]);
     }
 
@@ -142,7 +142,7 @@ class AuthController
         echo json_encode([
             'status' => 'success',
             'message' => 'Welcome back, ' . $customer->getName() . '! Signing you in...',
-            'redirect' => empty($_SESSION['is_admin']) ? '/account' : '/dashboard',
+            'redirect' => empty($_SESSION['is_admin']) ? '/account' : '/products',
         ]);
     }
 
