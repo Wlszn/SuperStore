@@ -292,7 +292,7 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
 .receipt-meta dd, .receipt-totals dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; }
 .receipt-totals { display: grid; justify-content: end; padding: 18px clamp(16px, 4vw, 30px); gap: 8px; }
 .receipt-totals > div { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; }
-.receipt-totals > div:first-child { font-size: 18px; font-weight: 650; }
+.receipt-totals > .receipt-total-paid { font-size: 18px; font-weight: 650; }
 .receipt-footer { border-top: 1px dashed var(--line); text-align: center; color: var(--muted); }
 .receipt-footer .barcode-label { margin-inline: auto; padding: 0; }
 
@@ -386,3 +386,5 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
 }
 
 .checkout-details { width: 100%; max-width: 640px; margin-bottom: 8px; }
+
+#points-redemption .hint { margin-top: 4px; }

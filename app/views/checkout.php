@@ -87,6 +87,16 @@ require __DIR__ . '/products/_start.php';
     <input id="membership-code" name="membership_code" value="<?= $e($membershipCode) ?>" maxlength="64" autocomplete="off">
     <p class="hint"><span data-i18n>Earn 10 points per dollar and receive an emailed receipt with a membership code. Clear the field to continue as a guest.</span></p>
     <p class="hint"><span data-i18n>Classroom payment simulation. Prices are final in CAD. No card details required.</span></p>
+    <?php if ($membershipCode !== ''): ?>
+        <div class="checkout-details" id="points-redemption" data-balance="<?= (int) ($profile['points'] ?? 0) ?>">
+            <label for="redeem-points" data-i18n>Use points</label>
+            <input type="text" inputmode="numeric" id="redeem-points" name="redeem_points" value="0"
+                aria-describedby="points-help points-available">
+            <p id="points-help" class="hint" data-i18n>100 points = $1 off. Earn points on the amount you pay.</p>
+            <p id="points-available" class="hint" data-i18n><?= (int) ($profile['points'] ?? 0) ?> points available</p>
+        </div>
+    <?php endif; ?>
+    <p id="points-discount" class="hint" hidden></p>
     <h2 id="total" data-i18n>Total $0.00</h2>
     <button class="button primary" id="pay" disabled><span data-i18n>Confirm payment</span></button>
 </form>

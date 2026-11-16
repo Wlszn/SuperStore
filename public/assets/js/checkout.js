@@ -19,6 +19,12 @@
     const notice = document.getElementById('notice');
     const basket = document.getElementById('basket');
     const pay = document.getElementById('pay');
+    const membership = document.getElementById('membership-code');
+    const ownMembership = membership.value;
+    const pointsPanel = document.getElementById('points-redemption');
+    const pointsInput = document.getElementById('redeem-points');
+    const pointsDiscount = document.getElementById('points-discount');
+    let pointsLimit = 0;
     let busy = false;
     let scanCursor = null;
     let readerSession;
@@ -116,9 +122,22 @@
         for (const product of cart.values()) {
             cents += Math.round(Number(product.price) * 100) * product.quantity;
         }
-        const total = 'Total $' + (cents / 100).toFixed(2);
-        window.setLocalizedText(document.getElementById('total'), total);
-
+        let discount = 0;
+        if (pointsInput) {
+            const eligible = membership.value.trim() === ownMembership;
+            pointsPanel.hidden = !eligible;
+            pointsInput.disabled = !eligible;
+            if (!eligible) pointsInput.value = '0';
+            pointsLimit = Math.min(cents, Number(pointsPanel.dataset.balance));
+            if (eligible && !pointsError()) {
+                discount = Number(pointsInput.value);
+            }
+        }
+        pointsDiscount.hidden = discount === 0;
+        if (discount > 0) {
+            window.setLocalizedText(pointsDiscount, 'Points discount: $' + (discount / 100).toFixed(2));
+        }
+        window.setLocalizedText(document.getElementById('total'), 'Total $' + ((cents - discount) / 100).toFixed(2));
     }
 
     function render() {
@@ -199,7 +218,37 @@
         } catch (error) { message(error.message || 'Scanner lookup unavailable. Please retry.', true); }
         finally { busy = false; render(); input.focus(); }
     };
-    document.getElementById('membership-code').addEventListener('keydown', event => {
+    let previousPointsError;
+    function pointsError() {
+        if (!pointsInput || pointsInput.disabled || pointsInput.value === '') return;
+        if (!/^\d+$/.test(pointsInput.value)) return 'Enter a valid number of points.';
+
+        const points = Number(pointsInput.value);
+        if (points > Number(pointsPanel.dataset.balance)) return 'Not enough points for this discount.';
+        if (points > pointsLimit) return 'The points discount cannot exceed the order total.';
+    }
+
+    function validatePoints() {
+        const error = pointsError();
+        if (error) {
+            pointsInput.setAttribute('aria-invalid', 'true');
+            message(error, true);
+        } else {
+            pointsInput?.removeAttribute('aria-invalid');
+            if (previousPointsError) window.clearNotification(previousPointsError);
+        }
+        previousPointsError = error;
+        return !error;
+    }
+
+    function onPointsInput() {
+        updateTotal();
+        validatePoints();
+    }
+
+    membership.addEventListener('input', onPointsInput);
+    pointsInput?.addEventListener('input', onPointsInput);
+    membership.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
             event.preventDefault();
             message('Membership code entered. It will be checked when you confirm payment.');
@@ -237,6 +286,10 @@
         address.value = address.value.trim();
         phone.setCustomValidity(/^[0-9+() .-]+$/.test(phone.value) && digits.length >= 7 && digits.length <= 15
             ? '' : window.translate('Please enter a valid phone number.'));
+        if (!validatePoints()) {
+            pointsInput.focus();
+            return false;
+        }
         if (payment.checkValidity()) return true;
         message('Check your contact and delivery details.', true);
         payment.reportValidity();
@@ -254,6 +307,7 @@
         for (const field of ['csrf_token', 'key', 'membership_code']) {
             body.set(field, payment.elements.namedItem(field).value);
         }
+        if (pointsInput && !pointsInput.disabled) body.set('redeem_points', String(Number(pointsInput.value)));
         body.set('items', JSON.stringify([...cart.values()].map(p => ({id:p.id, quantity:p.quantity}))));
         try {
             const response = await fetch('/checkout', {method:'POST',body});

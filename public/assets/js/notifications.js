@@ -10,6 +10,9 @@
     }
 
     dismiss.addEventListener('click', hide);
+    window.clearNotification = message => {
+        if (text.dataset.i18n === message) hide();
+    };
     window.showNotification = (message, isError = false) => {
         clearTimeout(timeout);
         const changed = toast.hidden || text.dataset.i18n !== message || toast.classList.contains('error') !== isError;

@@ -58,3 +58,5 @@ Apply config/membership.sql for card codes up to 64 characters. Re-run config/ch
 3. Show the delivery reference, quantity, and date in Reception history and point out the updated stock.
 4. Open checkout from the product page, add the product, buy two units, and show the receipt and its barcode.
 5. Reopen the product to show that the delivery remains in its history and the sale reduced available stock by two units.
+
+Members can redeem 100 points for CAD 1 off. Points are earned at 10 per dollar actually paid after the discount. Re-run config/checkout.sql in Supabase before demonstrating redemption.

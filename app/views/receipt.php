@@ -50,7 +50,11 @@ $purchasedAt = (new DateTimeImmutable($receipt['purchased_at']))->setTimezone(ne
     </div>
 
     <dl class="receipt-totals">
-        <div><dt data-i18n>Total paid</dt><dd><?= $money($receipt['total']) ?> CAD</dd></div>
+        <?php if (($receipt['points_redeemed'] ?? 0) > 0): ?>
+            <div><dt data-i18n>Points redeemed</dt><dd><?= (int) $receipt['points_redeemed'] ?></dd></div>
+            <div><dt data-i18n>Points discount</dt><dd>-<?= $money($receipt['points_redeemed'] / 100) ?> CAD</dd></div>
+        <?php endif; ?>
+        <div class="receipt-total-paid"><dt data-i18n>Total paid</dt><dd><?= $money($receipt['total']) ?> CAD</dd></div>
         <div><dt data-i18n>Points earned</dt><dd><?= (int) $receipt['points_earned'] ?></dd></div>
     </dl>
 

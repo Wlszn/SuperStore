@@ -38,11 +38,14 @@ def api(method, path, body=None):
 
 def deliver(job):
     receipt = api("GET", "purchases?id=eq." + str(job["purchase_id"]) +
-                  "&select=id,total,points_earned,purchased_at,purchase_items(name,unit_price,quantity)")[0]
+                  "&select=*,purchase_items(name,unit_price,quantity)")[0]
     lines = ["SuperStore receipt #" + str(receipt["id"]), receipt["purchased_at"], ""]
     for item in receipt["purchase_items"]:
         amount = Decimal(str(item["unit_price"])) * item["quantity"]
         lines.append(f'{item["name"]} x {item["quantity"]} — CAD {amount:.2f}')
+    points_redeemed = receipt.get("points_redeemed", 0)
+    if points_redeemed:
+        lines.append(f"Points discount ({points_redeemed} points): -CAD {Decimal(points_redeemed) / 100:.2f}")
     lines.extend(["", f'Total: CAD {Decimal(str(receipt["total"])):.2f}',
                   f'Points earned: {receipt["points_earned"]}', "Simulated payment approved."])
     message = EmailMessage()

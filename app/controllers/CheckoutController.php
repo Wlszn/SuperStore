@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Models\ProductModel;
 use App\Services\SupaClient;
 use RuntimeException;
+use function config\supa_request;
 
 class CheckoutController
 {
@@ -25,7 +26,7 @@ class CheckoutController
             try {
                 $members = SupaClient::rows('GET', 'customers', [
                     'id' => 'eq.' . $_SESSION['customer_id'],
-                    'select' => 'name,email,phone,address,membership_number',
+                    'select' => 'name,email,phone,address,membership_number,points',
                     'limit' => 1,
                 ]);
                 $profile = $members[0] ?? [];
@@ -83,6 +84,14 @@ class CheckoutController
                 return;
             }
         }
+        $points = filter_var($_POST['redeem_points'] ?? 0, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 0, 'max_range' => 2147483647],
+        ]);
+        if ($points === false) {
+            jsonResponse(422, ['status' => 'error', 'message' => 'Enter a valid number of points.']);
+            return;
+        }
+
         try {
             $customerId = isset($_POST['membership']) ? ($_SESSION['customer_id'] ?? null) : null;
             $membership = trim(is_string($_POST['membership_code'] ?? null) ? $_POST['membership_code'] : '');
@@ -99,11 +108,32 @@ class CheckoutController
                 }
                 $customerId = $members[0]['id'];
             }
-            $receipt = SupaClient::rows('POST', 'rpc/complete_checkout',null, [
+            $payload = [
                 'p_key' => $key,
                 'p_customer' => $customerId,
                 'p_items' => $items,
-            ]);
+            ];
+            if ($points > 0) {
+                if (!isset($_SESSION['customer_id']) || (int) $customerId !== (int) $_SESSION['customer_id']) {
+                    jsonResponse(403, ['status' => 'error', 'message' => 'Use your own membership to spend points.']);
+                    return;
+                }
+                $payload['p_redeem_points'] = $points;
+                [$status, $receipt] = supa_request('POST', 'rpc/complete_checkout', null, $payload);
+                if (($receipt['code'] ?? '') === 'PGRST202') {
+                    jsonResponse(503, ['status' => 'error', 'message' => 'Points discounts are not available yet. Clear the points field to continue.']);
+                    return;
+                }
+                if ($status === 422 && ($receipt['code'] ?? '') === 'PT422') {
+                    jsonResponse(422, ['status' => 'error', 'message' => $receipt['message']]);
+                    return;
+                }
+                if ($status < 200 || $status >= 300 || !isset($receipt['id'])) {
+                    throw new RuntimeException('Checkout failed.');
+                }
+            } else {
+                $receipt = SupaClient::rows('POST', 'rpc/complete_checkout', null, $payload);
+            }
             $_SESSION['receipts'][(int) $receipt['id']] = true;
             jsonResponse(200, [
                 'status' => 'success',
@@ -196,7 +226,7 @@ class CheckoutController
         try {
             $query = [
                 'id' => 'eq.' . $id,
-                'select' => 'id,customer_id,total,points_earned,purchased_at,purchase_items(name,unit_price,quantity)',
+                'select' => '*,purchase_items(name,unit_price,quantity)',
             ];
             if (empty($_SESSION['receipts'][$id])) {
                 if (!isset($_SESSION['customer_id'])) {
