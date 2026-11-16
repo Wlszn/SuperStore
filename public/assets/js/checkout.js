@@ -256,6 +256,9 @@
     });
     const deliveryOption = payment.elements.namedItem('delivery');
     const address = payment.elements.namedItem('address');
+    // In-store purchase by default: contact and delivery details are only asked for a delivery.
+    const deliver = document.getElementById('deliver-order');
+    const deliveryDetails = document.getElementById('delivery-details');
 
     function estimateDelivery() {
         const date = new Date();
@@ -265,13 +268,21 @@
     }
 
     function updateOrderForm() {
+        deliveryDetails.hidden = !deliver.checked;
+        document.getElementById('delivery-heading').hidden = !deliver.checked;
+        // Disabled fields are skipped by the browser's form validation.
+        for (const field of deliveryDetails.querySelectorAll('input, select')) field.disabled = !deliver.checked;
         const pickup = deliveryOption.value === 'pickup';
         document.getElementById('shipping-address').hidden = pickup;
-        address.disabled = pickup;
+        address.disabled = pickup || !deliver.checked;
         address.required = !pickup;
         window.setLocalizedText(document.getElementById('order-estimate'), 'Estimated fulfillment: ' + estimateDelivery());
     }
 
+    deliver.addEventListener('change', () => {
+        updateOrderForm();
+        message(deliver.checked ? 'Enter your contact and delivery details.' : 'In-store purchase. No delivery details needed.');
+    });
     deliveryOption.addEventListener('change', () => {
         updateOrderForm();
         message('Delivery option updated.');
@@ -314,9 +325,11 @@
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             try {
-                const reference = 'SS-' + String(result.receipt_id).padStart(6, '0');
-                const fulfillment = { delivery: deliveryOption.value, estimate: estimateDelivery() };
-                sessionStorage.setItem('superstore.fulfillment.' + reference, JSON.stringify(fulfillment));
+                if (deliver.checked) {
+                    const reference = 'SS-' + String(result.receipt_id).padStart(6, '0');
+                    const fulfillment = { delivery: deliveryOption.value, estimate: estimateDelivery() };
+                    sessionStorage.setItem('superstore.fulfillment.' + reference, JSON.stringify(fulfillment));
+                }
                 sessionStorage.setItem('superstore.inventory.notice', 'Payment confirmed.');
             } catch {}
             location.assign(result.redirect);

@@ -60,8 +60,9 @@ require __DIR__ . '/products/_start.php';
     <?php elseif ($membershipUnavailable): ?>
         <p class="hint" data-i18n>Your membership code could not be loaded. You can still scan or enter it.</p>
     <?php endif; ?>
-    <h2 data-i18n>Contact and delivery</h2>
-    <div class="fields checkout-details">
+    <label class="checkbox-line"><input type="checkbox" id="deliver-order"> <span data-i18n>Deliver this order (optional)</span></label>
+    <h2 data-i18n id="delivery-heading" hidden>Contact and delivery</h2>
+    <div class="fields checkout-details" id="delivery-details" hidden>
         <label><span data-i18n>Full name</span>
             <input name="name" value="<?= $e($profile['name'] ?? '') ?>" autocomplete="name" maxlength="100" required>
         </label>

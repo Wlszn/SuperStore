@@ -234,6 +234,8 @@ dialog .notice { margin: 14px 0 0; }
 .reader-controls .hint { margin: 0; }
 .payment-panel { display: grid; gap: 10px; justify-items: start; }
 .payment-panel h2, .payment-panel .hint { margin: 0; }
+.checkbox-line { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.checkbox-line input { accent-color: var(--blue); width: 18px; height: 18px; }
 
 @media (max-width: 560px) {
     .sidebar nav { order: 1; width: 100%; }
