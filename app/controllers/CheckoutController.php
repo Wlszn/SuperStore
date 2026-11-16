@@ -91,6 +91,11 @@ class CheckoutController
             jsonResponse(422, ['status' => 'error', 'message' => 'Enter a valid number of points.']);
             return;
         }
+        $method = $_POST['payment_method'] ?? 'card';
+        if (!in_array($method, ['card', 'cash'], true)) {
+            jsonResponse(422, ['status' => 'error', 'message' => 'Choose card or cash.']);
+            return;
+        }
 
         try {
             $customerId = isset($_POST['membership']) ? ($_SESSION['customer_id'] ?? null) : null;
@@ -133,6 +138,14 @@ class CheckoutController
                 }
             } else {
                 $receipt = SupaClient::rows('POST', 'rpc/complete_checkout', null, $payload);
+            }
+            if ($method === 'cash') {
+                // 'card' is the column default. The purchase is already saved, so a failure here
+                // (for example config/checkout.sql not re-run yet) must not report the payment as failed.
+                try {
+                    SupaClient::rows('PATCH', 'purchases', ['id' => 'eq.' . $receipt['id']], ['payment_method' => 'cash']);
+                } catch (RuntimeException $e) {
+                }
             }
             $_SESSION['receipts'][(int) $receipt['id']] = true;
             jsonResponse(200, [

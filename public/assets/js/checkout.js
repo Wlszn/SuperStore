@@ -25,6 +25,8 @@
     const pointsInput = document.getElementById('redeem-points');
     const pointsDiscount = document.getElementById('points-discount');
     let pointsLimit = 0;
+    let dueCents = 0; // amount to pay after the points discount
+    let step = null; // null while scanning, then 'details', 'confirm' or 'payment'
     let busy = false;
     let scanCursor = null;
     let readerSession;
@@ -137,8 +139,9 @@
         if (discount > 0) {
             window.setLocalizedText(pointsDiscount, 'Points discount: $' + (discount / 100).toFixed(2));
         }
-        window.setLocalizedText(document.getElementById('total'), 'Total $' + ((cents - discount) / 100).toFixed(2));
-        showMember(cents - discount);
+        dueCents = cents - discount;
+        window.setLocalizedText(document.getElementById('total'), 'Total $' + (dueCents / 100).toFixed(2));
+        showMember(dueCents);
     }
 
     // Membership card check: the result of the last lookup, or null when no valid card is entered.
@@ -189,7 +192,7 @@
             quantity.max = String(Math.min(product.in_stock, 1000));
             quantity.step = '1';
             quantity.value = String(product.quantity);
-            quantity.disabled = busy;
+            quantity.disabled = busy || step !== null;
             quantity.dataset.i18nAriaLabel = 'Quantity';
             quantity.setAttribute('aria-label', window.translate('Quantity'));
             quantity.addEventListener('change', () => {
@@ -212,7 +215,7 @@
             const remove = document.createElement('button');
             remove.className = 'button';
             window.setLocalizedText(remove, "Remove");
-            remove.disabled = busy;
+            remove.disabled = busy || step !== null;
             remove.onclick = () => { cart.delete(product.id); render(); message('Item removed.'); };
             cell.append(remove);
             row.append(cell);
@@ -220,8 +223,12 @@
         }
         updateTotal();
         document.getElementById('empty').hidden = cart.size > 0;
+        // Once checkout starts, the basket is locked so the customer pays for the list they confirmed.
         pay.disabled = busy || !cart.size;
-        reader.disabled = busy;
+        pay.hidden = step !== null;
+        reader.disabled = busy || step !== null;
+        scanInput.disabled = step !== null;
+        if (picker) picker.disabled = step !== null;
     }
     const picker = document.getElementById('checkout-product');
     const scanInput = document.getElementById('code');
@@ -234,7 +241,7 @@
 
     document.getElementById('scan').onsubmit = async event => {
         event.preventDefault();
-        if (busy) return;
+        if (busy || step !== null) return;
         busy = true;
         render();
         const input = document.getElementById('code');
@@ -347,11 +354,97 @@
         return false;
     }
 
-    payment.onsubmit = async event => {
-        event.preventDefault();
-        if (busy || !cart.size || !validateContactDetails()) return;
+    // Checkout steps: 1. membership card and delivery, 2. confirm the list, 3. payment.
+    const steps = {
+        details: document.getElementById('step-details'),
+        confirm: document.getElementById('step-confirm'),
+        payment: document.getElementById('step-payment'),
+    };
+    const cashBox = document.getElementById('cash');
+    const cashGiven = document.getElementById('cash-given');
+    const change = document.getElementById('change');
+
+    function showStep(name) {
+        step = name;
+        for (const [key, section] of Object.entries(steps)) section.hidden = key !== name;
+        cashBox.hidden = true;
+        render();
+    }
+
+    pay.addEventListener('click', () => {
+        if (busy || !cart.size) return;
         stopReader();
-        window.setLocalizedText(readerStatus, "Reader stopped for payment.");
+        window.setLocalizedText(readerStatus, 'Reader stopped for payment.');
+        showStep('details');
+        membership.focus();
+        membership.select();
+    });
+
+    for (const back of document.querySelectorAll('[data-back]')) {
+        back.addEventListener('click', () => { if (!busy) showStep(back.dataset.back || null); });
+    }
+
+    async function detailsNext() {
+        // A card number that was typed but not checked yet is checked now.
+        if (membership.value.trim() !== '' && !member) await lookUpMember();
+        if (membership.value.trim() !== '' && !member) {
+            membership.focus();
+            return;
+        }
+        if (!validateContactDetails()) return;
+
+        const summary = document.getElementById('summary');
+        summary.replaceChildren();
+        for (const product of cart.values()) {
+            const line = document.createElement('li');
+            line.textContent = product.quantity + ' \u00d7 ' + product.name + ' \u00b7 $' + (Number(product.price) * product.quantity).toFixed(2);
+            summary.append(line);
+        }
+        window.setLocalizedText(document.getElementById('summary-member'), member
+            ? 'Member: {0} \u00b7 {1} points. This purchase earns {2} points.'
+                .replace('{0}', member.first_name).replace('{1}', member.points).replace('{2}', Math.floor(dueCents / 10))
+            : 'Guest checkout: no points earned.');
+        const deliveryLabels = { standard: 'Delivery: Standard delivery', express: 'Delivery: Express delivery', pickup: 'Delivery: Store pickup' };
+        window.setLocalizedText(document.getElementById('summary-delivery'),
+            deliver.checked ? deliveryLabels[deliveryOption.value] : 'In-store purchase.');
+        showStep('confirm');
+    }
+
+    document.getElementById('details-next').addEventListener('click', detailsNext);
+    document.getElementById('confirm-list').addEventListener('click', () => showStep('payment'));
+
+    document.getElementById('pay-card').addEventListener('click', () => {
+        message('Card approved (simulated). Saving your purchase...');
+        submitPayment('card');
+    });
+    document.getElementById('pay-cash').addEventListener('click', () => {
+        cashBox.hidden = false;
+        cashGiven.value = '';
+        change.textContent = '';
+        cashGiven.focus();
+    });
+    cashGiven.addEventListener('input', () => {
+        const given = Math.round(cashGiven.valueAsNumber * 100);
+        window.setLocalizedText(change, given >= dueCents ? 'Change: $' + ((given - dueCents) / 100).toFixed(2) : '');
+    });
+
+    // Enter in a field submits the form: continue in step 1, pay in the cash box.
+    payment.onsubmit = event => {
+        event.preventDefault();
+        if (step === 'details') {
+            detailsNext();
+            return;
+        }
+        if (step !== 'payment' || cashBox.hidden) return;
+        if (!(Math.round(cashGiven.valueAsNumber * 100) >= dueCents)) {
+            message('The cash given must cover the total.', true);
+            return;
+        }
+        submitPayment('cash');
+    };
+
+    async function submitPayment(method) {
+        if (busy || !cart.size) return;
         busy = true;
         render();
         const body = new FormData();
@@ -359,6 +452,7 @@
             body.set(field, payment.elements.namedItem(field).value);
         }
         if (pointsInput && !pointsInput.disabled) body.set('redeem_points', String(Number(pointsInput.value)));
+        body.set('payment_method', method);
         body.set('items', JSON.stringify([...cart.values()].map(p => ({id:p.id, quantity:p.quantity}))));
         try {
             const response = await fetch('/checkout', {method:'POST',body});
@@ -374,11 +468,12 @@
             } catch {}
             location.assign(result.redirect);
         } catch (error) {
-            message(error.message || 'Result uncertain. Retry this basket to check payment safely.', true);
+            // Back to step 1: from there the customer can fix the card or go back to the basket.
             busy = false;
-            render();
+            showStep('details');
+            message(error.message || 'Result uncertain. Retry this basket to check payment safely.', true);
         }
-    };
+    }
     updateOrderForm();
     render();
     if (membership.value.trim() !== '') lookUpMember(); // signed-in member: card filled in already

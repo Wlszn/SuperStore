@@ -238,6 +238,9 @@ dialog .notice { margin: 14px 0 0; }
 .checkbox-line input { accent-color: var(--blue); width: 18px; height: 18px; }
 #member-status { color: #1e7a46; font-weight: 600; }
 #member-status.error { color: var(--red); }
+.member-card { margin: 8px 0 20px; }
+label[for="member-barcode"] { display: block; margin-bottom: 12px; font-weight: 600; }
+.checkout-summary { margin: 0; padding-left: 20px; }
 
 @media (max-width: 560px) {
     .sidebar nav { order: 1; width: 100%; }
