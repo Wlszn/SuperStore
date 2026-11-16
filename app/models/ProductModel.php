@@ -134,6 +134,9 @@ class ProductModel
         }
         if ($upc !== '' && (mb_strlen($upc) > 13 || preg_match('/[\x00-\x1F\x7F]/', $upc))) {
             $errors['upc'] = 'The barcode must contain 1 to 13 printable characters.';
+        } elseif (preg_match('/^\d{12,13}$/', $upc) && !self::hasValidCheckDigit(self::normalizeUpc($upc))) {
+            // A real UPC/EAN ends with a check digit, so a typo or bad scan is caught here.
+            $errors['upc'] = 'This barcode is not valid (wrong last digit). Scan it again or check for a typo.';
         }
         if ($epc !== '' && !preg_match('/^[0-9A-F]{1,24}$/', $epc)) {
             $errors['epc'] = 'The EPC must be up to 24 hexadecimal characters (0-9, A-F).';
@@ -191,6 +194,17 @@ class ProductModel
     private static function normalizeUpc(string $upc): string
     {
         return strlen($upc) === 12 ? '0' . $upc : $upc;
+    }
+
+    /** EAN-13 check digit*/
+    private static function hasValidCheckDigit(string $ean13): bool
+    {
+        $sum = 0;
+        for ($i = 0; $i < 12; $i++) {
+            $sum += (int) $ean13[$i] * ($i % 2 === 0 ? 1 : 3);
+        }
+
+        return (10 - $sum % 10) % 10 === (int) $ean13[12];
     }
 
     /** Make sure every value has a predictable PHP type. */

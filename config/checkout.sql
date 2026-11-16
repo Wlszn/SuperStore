@@ -2,6 +2,7 @@
 BEGIN;
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS request_key text UNIQUE;
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS points_redeemed integer NOT NULL DEFAULT 0 CHECK (points_redeemed >= 0);
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT 'card' CHECK (payment_method IN ('card', 'cash'));
 
 CREATE OR REPLACE FUNCTION complete_checkout(p_key text, p_customer integer, p_items jsonb, p_redeem_points integer)
 RETURNS jsonb LANGUAGE plpgsql SET search_path = public AS $$

@@ -25,6 +25,8 @@
     const pointsInput = document.getElementById('redeem-points');
     const pointsDiscount = document.getElementById('points-discount');
     let pointsLimit = 0;
+    let dueCents = 0; // amount to pay after the points discount
+    let step = null; // null while scanning, then 'details', 'confirm' or 'payment'
     let busy = false;
     let scanCursor = null;
     let readerSession;
@@ -144,7 +146,42 @@
         if (discount > 0) {
             window.setLocalizedText(pointsDiscount, 'Points discount: $' + (discount / 100).toFixed(2));
         }
-        window.setLocalizedText(document.getElementById('total'), 'Total $' + ((cents - discount) / 100).toFixed(2));
+        dueCents = cents - discount;
+        window.setLocalizedText(document.getElementById('total'), 'Total $' + (dueCents / 100).toFixed(2));
+        showMember(dueCents);
+    }
+
+    // Membership card check: the result of the last lookup, or null when no valid card is entered.
+    const memberStatus = document.getElementById('member-status');
+    let member = null;
+
+    function showMember(paidCents) {
+        if (!member) return;
+        // Same rule as complete_checkout(): 10 points per dollar paid, rounded down.
+        window.setLocalizedText(memberStatus, 'Member: {0} \u00b7 {1} points. This purchase earns {2} points.'
+            .replace('{0}', member.first_name).replace('{1}', member.points).replace('{2}', Math.floor(paidCents / 10)));
+    }
+
+    async function lookUpMember() {
+        const code = membership.value.trim();
+        member = null;
+        memberStatus.hidden = code === '';
+        memberStatus.classList.remove('error');
+        if (code === '') return;
+        try {
+            const response = await fetch('/api/members/lookup?code=' + encodeURIComponent(code), {cache: 'no-store'});
+            const result = await response.json();
+            if (code !== membership.value.trim()) return; // the field changed while waiting
+            if (!response.ok) throw new Error(result.message);
+            member = result.member;
+            updateTotal();
+            message('Membership card accepted.');
+        } catch (error) {
+            const text = error.message || 'Membership lookup unavailable. Please retry.';
+            memberStatus.classList.add('error');
+            window.setLocalizedText(memberStatus, text);
+            message(text, true);
+        }
     }
 
     function render() {
@@ -162,7 +199,7 @@
             quantity.max = String(Math.min(product.in_stock, 1000));
             quantity.step = '1';
             quantity.value = String(product.quantity);
-            quantity.disabled = busy;
+            quantity.disabled = busy || step !== null;
             quantity.dataset.i18nAriaLabel = 'Quantity';
             quantity.setAttribute('aria-label', window.translate('Quantity'));
             quantity.addEventListener('change', () => {
@@ -185,7 +222,7 @@
             const remove = document.createElement('button');
             remove.className = 'button';
             window.setLocalizedText(remove, "Remove");
-            remove.disabled = busy;
+            remove.disabled = busy || step !== null;
             remove.onclick = () => {
                 cart.delete(product.id);
                 if (lastAutoAddedEpc && product.epc === lastAutoAddedEpc) {
@@ -201,8 +238,12 @@
         }
         updateTotal();
         document.getElementById('empty').hidden = cart.size > 0;
+        // Once checkout starts, the basket is locked so the customer pays for the list they confirmed.
         pay.disabled = busy || !cart.size;
-        reader.disabled = busy;
+        pay.hidden = step !== null;
+        reader.disabled = busy || step !== null;
+        scanInput.disabled = step !== null;
+        if (picker) picker.disabled = step !== null;
     }
     const picker = document.getElementById('checkout-product');
     scanInput.addEventListener('input', () => { lastAutoAddedEpc = undefined; });
@@ -216,7 +257,7 @@
 
     document.getElementById('scan').onsubmit = async event => {
         event.preventDefault();
-        if (busy) return;
+        if (busy || step !== null) return;
         const code = scanInput.value.trim();
         if (code === lastAutoAddedEpc) {
             message('This RFID tag is already in your basket.');
@@ -269,14 +310,23 @@
 
     membership.addEventListener('input', onPointsInput);
     pointsInput?.addEventListener('input', onPointsInput);
+    // The USB barcode scanner types the card number then presses Enter.
     membership.addEventListener('keydown', event => {
         if (event.key === 'Enter') {
             event.preventDefault();
-            message('Membership code entered. It will be checked when you confirm payment.');
+            lookUpMember();
         }
+    });
+    membership.addEventListener('change', lookUpMember);
+    membership.addEventListener('input', () => {
+        member = null;
+        memberStatus.hidden = true;
     });
     const deliveryOption = payment.elements.namedItem('delivery');
     const address = payment.elements.namedItem('address');
+    // In-store purchase by default: contact and delivery details are only asked for a delivery.
+    const deliver = document.getElementById('deliver-order');
+    const deliveryDetails = document.getElementById('delivery-details');
 
     function estimateDelivery() {
         const date = new Date();
@@ -286,13 +336,21 @@
     }
 
     function updateOrderForm() {
+        deliveryDetails.hidden = !deliver.checked;
+        document.getElementById('delivery-heading').hidden = !deliver.checked;
+        // Disabled fields are skipped by the browser's form validation.
+        for (const field of deliveryDetails.querySelectorAll('input, select')) field.disabled = !deliver.checked;
         const pickup = deliveryOption.value === 'pickup';
         document.getElementById('shipping-address').hidden = pickup;
-        address.disabled = pickup;
+        address.disabled = pickup || !deliver.checked;
         address.required = !pickup;
         window.setLocalizedText(document.getElementById('order-estimate'), 'Estimated fulfillment: ' + estimateDelivery());
     }
 
+    deliver.addEventListener('change', () => {
+        updateOrderForm();
+        message(deliver.checked ? 'Enter your contact and delivery details.' : 'In-store purchase. No delivery details needed.');
+    });
     deliveryOption.addEventListener('change', () => {
         updateOrderForm();
         message('Delivery option updated.');
@@ -317,11 +375,97 @@
         return false;
     }
 
-    payment.onsubmit = async event => {
-        event.preventDefault();
-        if (busy || !cart.size || !validateContactDetails()) return;
+    // Checkout steps: 1. membership card and delivery, 2. confirm the list, 3. payment.
+    const steps = {
+        details: document.getElementById('step-details'),
+        confirm: document.getElementById('step-confirm'),
+        payment: document.getElementById('step-payment'),
+    };
+    const cashBox = document.getElementById('cash');
+    const cashGiven = document.getElementById('cash-given');
+    const change = document.getElementById('change');
+
+    function showStep(name) {
+        step = name;
+        for (const [key, section] of Object.entries(steps)) section.hidden = key !== name;
+        cashBox.hidden = true;
+        render();
+    }
+
+    pay.addEventListener('click', () => {
+        if (busy || !cart.size) return;
         stopReader();
-        window.setLocalizedText(readerStatus, "Reader stopped for payment.");
+        window.setLocalizedText(readerStatus, 'Reader stopped for payment.');
+        showStep('details');
+        membership.focus();
+        membership.select();
+    });
+
+    for (const back of document.querySelectorAll('[data-back]')) {
+        back.addEventListener('click', () => { if (!busy) showStep(back.dataset.back || null); });
+    }
+
+    async function detailsNext() {
+        // A card number that was typed but not checked yet is checked now.
+        if (membership.value.trim() !== '' && !member) await lookUpMember();
+        if (membership.value.trim() !== '' && !member) {
+            membership.focus();
+            return;
+        }
+        if (!validateContactDetails()) return;
+
+        const summary = document.getElementById('summary');
+        summary.replaceChildren();
+        for (const product of cart.values()) {
+            const line = document.createElement('li');
+            line.textContent = product.quantity + ' \u00d7 ' + product.name + ' \u00b7 $' + (Number(product.price) * product.quantity).toFixed(2);
+            summary.append(line);
+        }
+        window.setLocalizedText(document.getElementById('summary-member'), member
+            ? 'Member: {0} \u00b7 {1} points. This purchase earns {2} points.'
+                .replace('{0}', member.first_name).replace('{1}', member.points).replace('{2}', Math.floor(dueCents / 10))
+            : 'Guest checkout: no points earned.');
+        const deliveryLabels = { standard: 'Delivery: Standard delivery', express: 'Delivery: Express delivery', pickup: 'Delivery: Store pickup' };
+        window.setLocalizedText(document.getElementById('summary-delivery'),
+            deliver.checked ? deliveryLabels[deliveryOption.value] : 'In-store purchase.');
+        showStep('confirm');
+    }
+
+    document.getElementById('details-next').addEventListener('click', detailsNext);
+    document.getElementById('confirm-list').addEventListener('click', () => showStep('payment'));
+
+    document.getElementById('pay-card').addEventListener('click', () => {
+        message('Card approved (simulated). Saving your purchase...');
+        submitPayment('card');
+    });
+    document.getElementById('pay-cash').addEventListener('click', () => {
+        cashBox.hidden = false;
+        cashGiven.value = '';
+        change.textContent = '';
+        cashGiven.focus();
+    });
+    cashGiven.addEventListener('input', () => {
+        const given = Math.round(cashGiven.valueAsNumber * 100);
+        window.setLocalizedText(change, given >= dueCents ? 'Change: $' + ((given - dueCents) / 100).toFixed(2) : '');
+    });
+
+    // Enter in a field submits the form: continue in step 1, pay in the cash box.
+    payment.onsubmit = event => {
+        event.preventDefault();
+        if (step === 'details') {
+            detailsNext();
+            return;
+        }
+        if (step !== 'payment' || cashBox.hidden) return;
+        if (!(Math.round(cashGiven.valueAsNumber * 100) >= dueCents)) {
+            message('The cash given must cover the total.', true);
+            return;
+        }
+        submitPayment('cash');
+    };
+
+    async function submitPayment(method) {
+        if (busy || !cart.size) return;
         busy = true;
         render();
         const body = new FormData();
@@ -329,25 +473,30 @@
             body.set(field, payment.elements.namedItem(field).value);
         }
         if (pointsInput && !pointsInput.disabled) body.set('redeem_points', String(Number(pointsInput.value)));
+        body.set('payment_method', method);
         body.set('items', JSON.stringify([...cart.values()].map(p => ({id:p.id, quantity:p.quantity}))));
         try {
             const response = await fetch('/checkout', {method:'POST',body});
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             try {
-                const reference = 'SS-' + String(result.receipt_id).padStart(6, '0');
-                const fulfillment = { delivery: deliveryOption.value, estimate: estimateDelivery() };
-                sessionStorage.setItem('superstore.fulfillment.' + reference, JSON.stringify(fulfillment));
+                if (deliver.checked) {
+                    const reference = 'SS-' + String(result.receipt_id).padStart(6, '0');
+                    const fulfillment = { delivery: deliveryOption.value, estimate: estimateDelivery() };
+                    sessionStorage.setItem('superstore.fulfillment.' + reference, JSON.stringify(fulfillment));
+                }
                 sessionStorage.setItem('superstore.inventory.notice', 'Payment confirmed.');
             } catch {}
             location.assign(result.redirect);
         } catch (error) {
-            message(error.message || 'Result uncertain. Retry this basket to check payment safely.', true);
+            // Back to step 1: from there the customer can fix the card or go back to the basket.
             busy = false;
-            render();
+            showStep('details');
+            message(error.message || 'Result uncertain. Retry this basket to check payment safely.', true);
         }
-    };
+    }
     updateOrderForm();
     render();
+    if (membership.value.trim() !== '') lookUpMember(); // signed-in member: card filled in already
     document.getElementById('code').select();
 })();

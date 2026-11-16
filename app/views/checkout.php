@@ -55,50 +55,90 @@ require __DIR__ . '/products/_start.php';
 <form id="payment" class="panel editor-body section-gap payment-panel" novalidate>
     <input type="hidden" name="csrf_token" value="<?= $e($_SESSION['csrf_token']) ?>">
     <input type="hidden" name="key" value="<?= $e($_SESSION['checkout_key']) ?>">
-    <?php if (!isset($_SESSION['customer_id'])): ?>
-        <p><a href="/login"><span data-i18n>Sign in</span></a> <span data-i18n>to earn points, or continue as a guest.</span></p>
-    <?php elseif ($membershipUnavailable): ?>
-        <p class="hint" data-i18n>Your membership code could not be loaded. You can still scan or enter it.</p>
-    <?php endif; ?>
-    <h2 data-i18n>Contact and delivery</h2>
-    <div class="fields checkout-details">
-        <label><span data-i18n>Full name</span>
-            <input name="name" value="<?= $e($profile['name'] ?? '') ?>" autocomplete="name" maxlength="100" required>
-        </label>
-        <label><span data-i18n>Email address</span>
-            <input name="email" value="<?= $e($profile['email'] ?? '') ?>" type="email" autocomplete="email" maxlength="100" required>
-        </label>
-        <label><span data-i18n>Phone number</span>
-            <input name="phone" value="<?= $e($profile['phone'] ?? '') ?>" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" required>
-        </label>
-        <label><span data-i18n>Delivery option</span>
-            <select name="delivery">
-                <option value="standard" data-i18n>Standard delivery</option>
-                <option value="express" data-i18n>Express delivery</option>
-                <option value="pickup" data-i18n>Store pickup</option>
-            </select>
-        </label>
-        <label class="wide" id="shipping-address"><span data-i18n>Shipping address</span>
-            <input name="address" value="<?= $e($profile['address'] ?? '') ?>" autocomplete="street-address" maxlength="255" required>
-        </label>
-        <p id="order-estimate" class="hint wide"></p>
-    </div>
-    <label for="membership-code"><span data-i18n>Membership card barcode (optional)</span></label>
-    <input id="membership-code" name="membership_code" value="<?= $e($membershipCode) ?>" maxlength="64" autocomplete="off">
-    <p class="hint"><span data-i18n>Earn 10 points per dollar and receive an emailed receipt with a membership code. Clear the field to continue as a guest.</span></p>
-    <p class="hint"><span data-i18n>Classroom payment simulation. Prices are final in CAD. No card details required.</span></p>
-    <?php if ($membershipCode !== ''): ?>
-        <div class="checkout-details" id="points-redemption" data-balance="<?= (int) ($profile['points'] ?? 0) ?>">
-            <label for="redeem-points" data-i18n>Use points</label>
-            <input type="text" inputmode="numeric" id="redeem-points" name="redeem_points" value="0"
-                aria-describedby="points-help points-available">
-            <p id="points-help" class="hint" data-i18n>100 points = $1 off. Earn points on the amount you pay.</p>
-            <p id="points-available" class="hint" data-i18n><?= (int) ($profile['points'] ?? 0) ?> points available</p>
+
+    <!-- Step 1: membership card, points and delivery -->
+    <div id="step-details" class="payment-panel" hidden>
+        <h2 data-i18n>Step 1 of 3: Membership card</h2>
+        <?php if (!isset($_SESSION['customer_id'])): ?>
+            <p><a href="/login"><span data-i18n>Sign in</span></a> <span data-i18n>to earn points, or continue as a guest.</span></p>
+        <?php elseif ($membershipUnavailable): ?>
+            <p class="hint" data-i18n>Your membership code could not be loaded. You can still scan or enter it.</p>
+        <?php endif; ?>
+        <label for="membership-code"><span data-i18n>Membership card barcode (optional)</span></label>
+        <input id="membership-code" name="membership_code" value="<?= $e($membershipCode) ?>" maxlength="64" autocomplete="off">
+        <p id="member-status" class="hint" role="status" hidden></p>
+        <p class="hint"><span data-i18n>Earn 10 points per dollar and receive an emailed receipt with a membership code. Clear the field to continue as a guest.</span></p>
+        <?php if ($membershipCode !== ''): ?>
+            <div class="checkout-details" id="points-redemption" data-balance="<?= (int) ($profile['points'] ?? 0) ?>">
+                <label for="redeem-points" data-i18n>Use points</label>
+                <input type="text" inputmode="numeric" id="redeem-points" name="redeem_points" value="0"
+                    aria-describedby="points-help points-available">
+                <p id="points-help" class="hint" data-i18n>100 points = $1 off. Earn points on the amount you pay.</p>
+                <p id="points-available" class="hint" data-i18n><?= (int) ($profile['points'] ?? 0) ?> points available</p>
+            </div>
+        <?php endif; ?>
+        <label class="checkbox-line"><input type="checkbox" id="deliver-order"> <span data-i18n>Deliver this order (optional)</span></label>
+        <h2 data-i18n id="delivery-heading" hidden>Contact and delivery</h2>
+        <div class="fields checkout-details" id="delivery-details" hidden>
+            <label><span data-i18n>Full name</span>
+                <input name="name" value="<?= $e($profile['name'] ?? '') ?>" autocomplete="name" maxlength="100" required>
+            </label>
+            <label><span data-i18n>Email address</span>
+                <input name="email" value="<?= $e($profile['email'] ?? '') ?>" type="email" autocomplete="email" maxlength="100" required>
+            </label>
+            <label><span data-i18n>Phone number</span>
+                <input name="phone" value="<?= $e($profile['phone'] ?? '') ?>" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" required>
+            </label>
+            <label><span data-i18n>Delivery option</span>
+                <select name="delivery">
+                    <option value="standard" data-i18n>Standard delivery</option>
+                    <option value="express" data-i18n>Express delivery</option>
+                    <option value="pickup" data-i18n>Store pickup</option>
+                </select>
+            </label>
+            <label class="wide" id="shipping-address"><span data-i18n>Shipping address</span>
+                <input name="address" value="<?= $e($profile['address'] ?? '') ?>" autocomplete="street-address" maxlength="255" required>
+            </label>
+            <p id="order-estimate" class="hint wide"></p>
         </div>
-    <?php endif; ?>
+        <div class="heading-actions">
+            <button type="button" class="button primary" id="details-next"><span data-i18n>Continue</span></button>
+            <button type="button" class="button" data-back=""><span data-i18n>Back to basket</span></button>
+        </div>
+    </div>
+
+    <!-- Step 2: the customer confirms the list -->
+    <div id="step-confirm" class="payment-panel" hidden>
+        <h2 data-i18n>Step 2 of 3: Confirm your items</h2>
+        <ul id="summary" class="checkout-summary"></ul>
+        <p id="summary-member" class="hint"></p>
+        <p id="summary-delivery" class="hint"></p>
+        <div class="heading-actions">
+            <button type="button" class="button primary" id="confirm-list"><span data-i18n>Confirm list</span></button>
+            <button type="button" class="button" data-back="details"><span data-i18n>Back</span></button>
+        </div>
+    </div>
+
+    <!-- Step 3: simulated payment -->
+    <div id="step-payment" class="payment-panel" hidden>
+        <h2 data-i18n>Step 3 of 3: Payment</h2>
+        <p class="hint"><span data-i18n>Classroom payment simulation. Prices are final in CAD. No card details required.</span></p>
+        <div class="heading-actions">
+            <button type="button" class="button primary" id="pay-card"><span data-i18n>Pay by card</span></button>
+            <button type="button" class="button" id="pay-cash"><span data-i18n>Pay cash</span></button>
+            <button type="button" class="button" data-back="confirm"><span data-i18n>Back</span></button>
+        </div>
+        <div id="cash" class="payment-panel" hidden>
+            <label for="cash-given"><span data-i18n>Cash given</span></label>
+            <input id="cash-given" type="number" min="0" step="0.01" inputmode="decimal">
+            <p id="change" class="hint"></p>
+            <button class="button primary" id="cash-confirm"><span data-i18n>Pay</span></button>
+        </div>
+    </div>
+
     <p id="points-discount" class="hint" hidden></p>
     <h2 id="total" data-i18n>Total $0.00</h2>
-    <button class="button primary" id="pay" disabled><span data-i18n>Confirm payment</span></button>
+    <button type="button" class="button primary" id="pay" disabled><span data-i18n>Checkout</span></button>
 </form>
 <script src="/assets/js/checkout.js" defer></script>
 <?php require __DIR__ . '/products/_end.php'; ?>

@@ -91,6 +91,11 @@ class CheckoutController
             jsonResponse(422, ['status' => 'error', 'message' => 'Enter a valid number of points.']);
             return;
         }
+        $method = $_POST['payment_method'] ?? 'card';
+        if (!in_array($method, ['card', 'cash'], true)) {
+            jsonResponse(422, ['status' => 'error', 'message' => 'Choose card or cash.']);
+            return;
+        }
 
         try {
             $customerId = isset($_POST['membership']) ? ($_SESSION['customer_id'] ?? null) : null;
@@ -134,6 +139,14 @@ class CheckoutController
             } else {
                 $receipt = SupaClient::rows('POST', 'rpc/complete_checkout', null, $payload);
             }
+            if ($method === 'cash') {
+                // 'card' is the column default. The purchase is already saved, so a failure here
+                // (for example config/checkout.sql not re-run yet) must not report the payment as failed.
+                try {
+                    SupaClient::rows('PATCH', 'purchases', ['id' => 'eq.' . $receipt['id']], ['payment_method' => 'cash']);
+                } catch (RuntimeException $e) {
+                }
+            }
             $_SESSION['receipts'][(int) $receipt['id']] = true;
             jsonResponse(200, [
                 'status' => 'success',
@@ -146,6 +159,41 @@ class CheckoutController
                 'message' => 'Payment could not be confirmed. Stock may have changed or the database may be unavailable. Retry with the same basket to safely check the result.',
             ]);
         }
+    }
+
+    /**
+     * GET /api/members/lookup?code=SS100004
+     * Called by the kiosk when a membership card is scanned, so the customer sees right away
+     * whether the card is valid. Only the first name and points are returned: the kiosk is public.
+     */
+    public function memberLookup(): void
+    {
+        $code = trim(is_string($_GET['code'] ?? null) ? $_GET['code'] : '');
+        if ($code === '' || mb_strlen($code) > 64) {
+            jsonResponse(422, ['status' => 'error', 'message' => 'Scan or enter a membership card.']);
+            return;
+        }
+        try {
+            $members = SupaClient::rows('GET', 'customers', [
+                'membership_number' => 'eq.' . $code,
+                'select' => 'name,points',
+                'limit' => 1,
+            ]);
+        } catch (RuntimeException $e) {
+            jsonResponse(503, ['status' => 'error', 'message' => 'Membership lookup unavailable. Please retry.']);
+            return;
+        }
+        if (!$members) {
+            jsonResponse(404, ['status' => 'error', 'message' => 'Membership card not found.']);
+            return;
+        }
+        jsonResponse(200, [
+            'status' => 'success',
+            'member' => [
+                'first_name' => explode(' ', trim((string) $members[0]['name']))[0],
+                'points' => (int) $members[0]['points'],
+            ],
+        ]);
     }
 
     public function membership(): void

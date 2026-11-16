@@ -43,6 +43,21 @@ require __DIR__ . '/products/_start.php';
         <input type="hidden" name="csrf_token" value="<?= $e($_SESSION['csrf_token']) ?>">
         <h2 data-i18n>Membership</h2>
         <p class="membership-balance"><strong><?= number_format((int) ($customer['points'] ?? 0)) ?></strong> <span data-i18n>Points</span></p>
+        <?php $memberCode = (string) ($customer['membership_number'] ?? ''); ?>
+        <?php $memberBarcode = $memberCode !== '' ? App\Services\Barcode::code128($memberCode) : null; ?>
+        <?php if ($memberBarcode): ?>
+            <p class="hint"><span data-i18n>Show this card at the self-checkout and scan it with the barcode scanner.</span></p>
+            <figure class="barcode-label member-card">
+                <svg viewBox="0 0 <?= $memberBarcode['width'] ?> 42" width="<?= $memberBarcode['width'] * 2 ?>" role="img"
+                    aria-label="<?= $e('Barcode: ' . $memberCode) ?>" shape-rendering="crispEdges">
+                    <rect width="100%" height="100%" fill="white"/>
+                    <?php foreach ($memberBarcode['bars'] as [$x, $width]): ?>
+                        <rect x="<?= $x ?>" width="<?= $width ?>" height="42" fill="black"/>
+                    <?php endforeach; ?>
+                </svg>
+                <figcaption class="code"><?= $e($memberCode) ?></figcaption>
+            </figure>
+        <?php endif; ?>
         <label for="member-barcode"><span data-i18n>Membership barcode</span></label>
         <p class="hint"><span data-i18n>Scan a card into this field to link it to your account. Your previous membership code will be replaced.</span></p>
         <input id="member-barcode" name="membership_number" value="<?= $e($customer['membership_number'] ?? '') ?>" maxlength="64" required autocomplete="off">
