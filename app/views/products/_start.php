@@ -31,6 +31,9 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
                 <a href="/products/receive" class="nav-link <?= $section === 'receive' ? 'current' : '' ?>" <?= $section === 'receive' ? 'aria-current="page"' : '' ?>>
                     <span class="nav-icon" aria-hidden="true">↓</span> <span data-i18n>Receive stock</span>
                 </a>
+                <a href="/dashboard" class="nav-link <?= $section === 'fridges' ? 'current' : '' ?>" <?= $section === 'fridges' ? 'aria-current="page"' : '' ?>>
+                    <span class="nav-icon" aria-hidden="true">❄</span> <span data-i18n>Fridge dashboard</span>
+                </a>
             <?php endif; ?>
         </nav>
         <a class="nav-link signout" href="/logout"><span data-i18n>Sign out</span></a>
@@ -38,7 +41,11 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
     <main id="main">
         <div class="topbar">
             <button type="button" class="button" id="language-switch" aria-label="Change language">FR</button>
-            <a href="/products"><span data-i18n>Inventory</span></a><span aria-hidden="true">/</span><span <?= $section !== 'products' || !isset($product) || $title !== $product['name'] ? 'data-i18n' : '' ?>><?= $e($title) ?></span>
+            <?php if ($section === 'fridges'): ?>
+                <a href="/dashboard"><span data-i18n>Monitoring</span></a>
+            <?php else: ?>
+                <a href="/products"><span data-i18n>Inventory</span></a>
+            <?php endif; ?><span aria-hidden="true">/</span><span <?= $section !== 'products' || !isset($product) || $title !== $product['name'] ? 'data-i18n' : '' ?>><?= $e($title) ?></span>
         </div>
         <div class="content">
             <div class="notice toast" id="notice" hidden>

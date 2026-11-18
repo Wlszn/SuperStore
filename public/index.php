@@ -59,13 +59,13 @@ $routes = [
 
     'GET /login' => fn() => view('login'),
     'GET /signup' => fn() => view('signup'),
-    'GET /dashboard' => fn() => header('Location: /'),
+    'GET /dashboard' => [ThresholdController::class, 'index'],
 
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],
     'GET /logout' => [AuthController::class, 'logout'],
 
-    'GET /thresholds' => [ThresholdController::class, 'index'],
+    'GET /thresholds' => fn() => header('Location: /dashboard'), // thresholds are edited on the dashboard
     'POST /thresholds' => [ThresholdController::class, 'update'],
     'GET /api/thresholds' => [ThresholdController::class, 'json'],
 
