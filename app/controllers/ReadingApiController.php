@@ -80,21 +80,18 @@ class ReadingApiController
         ]);
     }
 
-    /** GET /api/readings/latest: everything the dashboard needs in one call. */
+    /**
+     * GET /api/readings/latest: everything the dashboard needs in one call.
+     * The dashboard polls this every 2 seconds, so it makes only 2 Supabase
+     * requests (fridges with their newest reading, then the fan).
+     */
     public function latest(): void
     {
         try {
-            $fridges = array_map(function (array $fridge): array {
-                $reading = $this->readings->latestByFridge($fridge['id']);
-
-                return [
-                    'id' => $fridge['id'],
-                    'name' => $fridge['name'],
-                    'max_temp' => $fridge['max_temp'],
-                    'reading' => $reading,   // null until the fridge has sent something
-                    'over_threshold' => $reading !== null && $reading['temperature'] > $fridge['max_temp'],
-                ];
-            }, $this->fridges->all());
+            $fridges = array_map(fn(array $fridge): array => $fridge + [
+                // 'reading' is null until the fridge has sent something
+                'over_threshold' => $fridge['reading'] !== null && $fridge['reading']['temperature'] > $fridge['max_temp'],
+            ], $this->fridges->allWithLatestReading());
 
             jsonResponse(200, [
                 'status' => 'success',
