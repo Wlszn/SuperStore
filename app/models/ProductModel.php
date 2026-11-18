@@ -94,11 +94,6 @@ class ProductModel
         SupaClient::rows('DELETE', self::TABLE, ['id' => 'eq.' . $id]);
     }
 
-    public function pointsCalculate(float $price): int
-    {
-        return (int)$price * 10;
-    }
-
     public function validate(array $input, ?int $id = null): array
     {
         $errors = [];

@@ -272,13 +272,6 @@ class ProductController
         ]);
     }
 
-    public function pointsCalculate(float $price): int
-    {
-        //for every dollar they get 10 points out of it
-
-        return (int)$price * 10;
-    }
-
     /** GET /api/products/lookup?code=...: the product behind a scanned UPC or EPC. */
     public function lookup(): void
     {
@@ -403,15 +396,6 @@ class ProductController
             'message' => 'Please fix the highlighted fields and try again.',
             'errors' => $errors,
         ]);
-    }
-
-    public function getProductByBarcode(string $barcode): ?array
-    {
-        try {
-            return $this->products->findByCode($barcode);
-        } catch (RuntimeException $e) {
-            return null;
-        }
     }
 
     private function serverError(): void

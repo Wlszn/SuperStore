@@ -48,7 +48,7 @@ Barcodes: a 12-digit UPC-A is stored as 13 digits (leading `0`), and the check d
 | `GET /api/scans/latest` | The newest scan and its `last_id`. |
 | `GET /api/scans/latest?after=12` | Every scan newer than `12`, oldest first, and the new `last_id`. |
 
-Browser checkout accepts keyboard-mode barcode scans in the focused field. The standalone scanner script sends a code to `POST /api/barcode` as `{"barcode": "0123456789012"}` for its own session cart. Payment and points for browser checkout are handled by `POST /checkout`.
+Browser checkout accepts keyboard-mode barcode scans in the focused field. Payment and points are handled by `POST /checkout`.
 
 ## Fridges and fan
 

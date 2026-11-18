@@ -3,7 +3,7 @@ from time import sleep
 import sys
 
 
-blue_led = LED(17)
+blue_led = LED(23)   # not 17: GPIO 17 drives the fan's motor driver (fan.py)
 red_led = LED(18)
 
 

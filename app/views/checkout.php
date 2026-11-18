@@ -77,7 +77,7 @@ require __DIR__ . '/products/_start.php';
                 <p id="points-available" class="hint" data-i18n><?= (int) ($profile['points'] ?? 0) ?> points available</p>
             </div>
         <?php endif; ?>
-        <label class="checkbox-line"><input type="checkbox" id="deliver-order"> <span data-i18n>Deliver this order (optional)</span></label>
+        <label class="checkbox-line" <?= ORDER_TRACKING ? '' : 'hidden' ?>><input type="checkbox" id="deliver-order"> <span data-i18n>Deliver this order (optional)</span></label>
         <h2 data-i18n id="delivery-heading" hidden>Contact and delivery</h2>
         <div class="fields checkout-details" id="delivery-details" hidden>
             <label><span data-i18n>Full name</span>

@@ -159,7 +159,7 @@ Design, relationships and examples: [`docs/ER.md`](docs/ER.md). Editable diagram
 
 | Component | Phase | Connection |
 |---|---|---|
-| Blue / red LEDs | 1 | GPIO 17 / GPIO 18 |
+| Blue / red LEDs | 1 | GPIO 23 / GPIO 18 |
 | 2 × ESP32 + DHT11 | 2 | Wi-Fi (MQTT) |
 | DC motor + driver | 2 | GPIO 22 (enable), 27 (in 1), 17 (in 2) |
 | USB barcode scanner | 3 | USB (keyboard mode) |
