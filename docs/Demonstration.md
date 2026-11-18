@@ -48,7 +48,7 @@ SMTP delivery cannot guarantee exactly-once delivery. If a worker stops after SM
 - Real receipt delivery after email configuration and queue migration.
 - CF600 hardware and SDK integration.
 - Full French coverage. The language switch currently translates selected customer labels and messages.
-Apply config/membership.sql for card codes up to 64 characters. Re-run config/checkout.sql for the ten-points-per-dollar rule. Existing receipts keep their original points.
+Re-run config/checkout.sql for card codes up to 64 characters and the ten-points-per-dollar rule. Existing receipts keep their original points.
 
 
 ## Delivery-to-sale demo

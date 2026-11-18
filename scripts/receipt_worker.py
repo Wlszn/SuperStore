@@ -4,6 +4,7 @@ import smtplib
 import ssl
 import time
 import urllib.request
+from datetime import datetime
 from decimal import Decimal
 from email.message import EmailMessage
 from pathlib import Path
@@ -39,7 +40,9 @@ def api(method, path, body=None):
 def deliver(job):
     receipt = api("GET", "purchases?id=eq." + str(job["purchase_id"]) +
                   "&select=*,purchase_items(name,unit_price,quantity)")[0]
-    lines = ["SuperStore receipt #" + str(receipt["id"]), receipt["purchased_at"], ""]
+    # Supabase stores UTC; show the time of the Pi (Montreal), e.g. 2026-11-18 17:39.
+    purchased_at = datetime.fromisoformat(receipt["purchased_at"]).astimezone()
+    lines = ["SuperStore receipt #" + str(receipt["id"]), purchased_at.strftime("%Y-%m-%d %H:%M"), ""]
     for item in receipt["purchase_items"]:
         amount = Decimal(str(item["unit_price"])) * item["quantity"]
         lines.append(f'{item["name"]} x {item["quantity"]} — CAD {amount:.2f}')

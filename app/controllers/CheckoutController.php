@@ -67,7 +67,8 @@ class CheckoutController
             return;
         }
         $items = json_decode($_POST['items'] ?? '', true);
-        if (!is_array($items) || !array_is_list($items) || count($items) < 1 || count($items) > 100) {
+        // array_values() check instead of array_is_list(), which needs PHP 8.1 (WAMP has 8.0).
+        if (!is_array($items) || $items !== array_values($items) || count($items) < 1 || count($items) > 100) {
             jsonResponse(422, [
                 'status' => 'error',
                 'message' => 'Add between 1 and 100 products.',

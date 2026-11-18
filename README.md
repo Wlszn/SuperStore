@@ -97,7 +97,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ### 2. Database
 
-For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Apply `config/checkout.sql`, `config/membership.sql`, and `config/receipt_emails.sql` in that order. Those three files can also be applied to an existing Phase 3 database. Give your account admin access:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql` and `config/receipt_emails.sql`, in that order. Both are safe to run again on an existing database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';

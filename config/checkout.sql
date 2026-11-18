@@ -1,5 +1,7 @@
 -- Run after config/db.sql. Safe to run again.
 BEGIN;
+-- Membership card codes up to 64 characters (a scanned card can be longer than SS100001).
+ALTER TABLE customers ALTER COLUMN membership_number TYPE varchar(64);
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS request_key text UNIQUE;
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS points_redeemed integer NOT NULL DEFAULT 0 CHECK (points_redeemed >= 0);
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT 'card' CHECK (payment_method IN ('card', 'cash'));
