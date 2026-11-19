@@ -18,10 +18,10 @@ For a reader configured in serial (CDC-COM) mode, use the serial bridge instead:
 
 On Windows replace the port with the reader's COM port and use `python`. If SuperStore runs on a different machine, pass its base URL. Restart the reader script after updating it. When using the SDK bridge, omit `--read-only` for checkout.
 
-For registration, open Add product, focus Barcode and scan the card. Select Read EPC from reader and present one RFID tag. Save the product, then receive stock.
+To register a product type, open Add product, click the Barcode field and scan the product's barcode. To receive stock, open Receive stock, scan the same barcode (or choose the product), put all the new tagged items on the reader, then select Receive items: every new tag becomes one item.
 
-For checkout, select Start RFID reader before placing products on the reader. Matching products are added automatically, and the scan field shows the latest EPC when it is clear. Each EPC is counted once per basket. The bridge forwards batches of up to 100 tags.
+At the self-checkout the reader starts by itself. Put all the items on it: they are added together and grouped by product. Each EPC is counted once per basket. The bridge forwards batches of up to 100 tags.
 
-The application assigns the existing EPC to a product record. It does not rewrite RFID tag memory.
+The application links each existing EPC to an item. It does not rewrite RFID tag memory.
 
 Verified on this computer: Windows SDK loads and USB enumeration runs. No reader was connected, so physical tag reads and Raspberry Pi execution remain unverified.

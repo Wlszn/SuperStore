@@ -12,6 +12,7 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
     <script src="/assets/js/form-utils.js" defer></script>
     <script src="/assets/js/language.js" defer></script>
     <script src="/assets/js/notifications.js" defer></script>
+    <script src="/assets/js/rfid-feed.js" defer></script>
     <script src="/assets/js/inventory.js" defer></script>
 </head>
 <body data-order-owner="<?= $e($_SESSION['customer_id'] ?? 'guest') ?>">

@@ -1,20 +1,24 @@
 (() => {
+    // Self-checkout, RFID only: every item has its own tag. The customer puts everything on the
+    // reader, rfid-feed.js hands over all the tags at once, and the basket groups them by product.
     const payment = document.getElementById('payment');
     const checkoutKey = payment.elements.namedItem('key').value;
     const storageKey = 'superstore.basket';
-    const cart = new Map();
-    const seenTags = new Set();
+    const tags = new Map();      // epc -> product, for every item in the basket
+    const ignoredTags = new Set(); // removed by the customer, unknown or already sold: not added again
+    let cart = new Map();        // product id -> {...product, quantity, epcs}, built from tags
+
     try {
         const saved = JSON.parse(sessionStorage.getItem(storageKey));
         if (saved?.key === checkoutKey) {
-            for (const item of saved.items) cart.set(item.id, item);
-            for (const epc of saved.epcs || []) seenTags.add(epc);
+            for (const [epc, product] of saved.tags) tags.set(epc, product);
+            for (const epc of saved.ignored) ignoredTags.add(epc);
         }
     } catch {}
 
     function saveBasket() {
         try {
-            sessionStorage.setItem(storageKey, JSON.stringify({key: checkoutKey, items: [...cart.values()], epcs: [...seenTags]}));
+            sessionStorage.setItem(storageKey, JSON.stringify({key: checkoutKey, tags: [...tags], ignored: [...ignoredTags]}));
         } catch {}
     }
 
@@ -30,105 +34,57 @@
     let dueCents = 0; // amount to pay after the points discount
     let step = null; // null while scanning, then 'details', 'confirm' or 'payment'
     let busy = false;
-    let scanCursor = null;
-    let readerSession;
-    let pollTimer;
-    const ignoredTags = new Set();
+    let stopFeed;
     const reader = document.getElementById('reader');
     const readerStatus = document.getElementById('reader-status');
-    const scanInput = document.getElementById('code');
-    let lastAutoAddedEpc;
+    const readerLight = document.getElementById('reader-light');
 
-    async function pollReader(session) {
-        let changed = false;
-        try {
-            if (busy || step !== null) return;
-
-            const query = scanCursor === null ? '?arm=1' : '?after=' + scanCursor;
-            const options = { signal: session.signal, cache: 'no-store' };
-            const response = await fetch('/api/scans/latest' + query, options);
-            if (!response.ok) throw new Error('Reader feed unavailable. Retrying.');
-            const result = await response.json();
-            if (session.signal.aborted || busy) return;
-
-            if (scanCursor === null) {
-                scanCursor = result.last_id;
+    // One batch = everything the reader saw together: add it all, then one message.
+    function addTags(items) {
+        if (busy || step !== null) return;
+        let added = 0;
+        const problems = [];
+        for (const item of items) {
+            if (tags.has(item.epc) || ignoredTags.has(item.epc)) continue;
+            if (item.status === 'in_stock') {
+                tags.set(item.epc, item.product);
+                added++;
             } else {
-                for (const scan of result.scans) {
-                    const epc = scan.epc.trim().toUpperCase();
-                    if (seenTags.has(epc) || ignoredTags.has(epc)) {
-                        scanCursor = scan.id;
-                        continue;
-                    }
-                    const lookup = await fetch('/api/products/lookup?type=epc&code=' + encodeURIComponent(epc), options);
-                    if (!lookup.ok && lookup.status !== 404) throw new Error('Product lookup unavailable. Retrying.');
-                    const found = await lookup.json();
-                    if (session.signal.aborted || busy) return;
-
-                    if (lookup.ok) {
-                        const product = found.product;
-                        const quantity = (cart.get(product.id)?.quantity || 0) + 1;
-                        if (quantity <= Math.min(product.in_stock, 1000)) {
-                            cart.set(product.id, {...product, quantity});
-                            seenTags.add(epc);
-                            if (!scanInput.value || scanInput.value === lastAutoAddedEpc) {
-                                scanInput.value = epc;
-                                lastAutoAddedEpc = epc;
-                                if (document.activeElement === scanInput) scanInput.select();
-                            }
-                            changed = true;
-                        } else {
-                            ignoredTags.add(epc);
-                            message('Not enough stock for ' + product.name, true);
-                        }
-                    } else {
-                        ignoredTags.add(epc);
-                        message('Unknown RFID tag: ' + epc, true);
-                    }
-                    scanCursor = scan.id;
-                }
+                ignoredTags.add(item.epc);
+                problems.push(item.status === 'sold'
+                    ? 'This item was already sold: {0}'.replace('{0}', item.product.name)
+                    : 'Unknown RFID tag: {0}'.replace('{0}', item.epc));
             }
-            window.setLocalizedText(readerStatus, 'Waiting for RFID tags. Place products on the reader.');
-        } catch (error) {
-            if (!session.signal.aborted) {
-                window.setLocalizedText(readerStatus, error instanceof TypeError
-                    ? 'Reader feed unavailable. Retrying.'
-                    : error.message);
-            }
-        } finally {
-            if (changed && !busy) {
-                render();
-                if (notice.hidden || !notice.classList.contains('error')) message('RFID items added to your basket.');
-            }
-            if (!session.signal.aborted) pollTimer = setTimeout(() => pollReader(session), 1000);
         }
+        if (added) {
+            render();
+            message((added === 1 ? '{0} item added to your basket.' : '{0} items added to your basket.').replace('{0}', added));
+        }
+        if (problems.length) message(problems.join(' '), true);
     }
 
-    function stopReader() {
-        readerSession?.abort();
-        readerSession = undefined;
-        clearTimeout(pollTimer);
-        window.setLocalizedText(reader, 'Start RFID reader');
+    function setReaderStatus(text, isError) {
+        window.setLocalizedText(readerStatus, text);
+        readerStatus.classList.toggle('error', isError);
+        readerLight.classList.toggle('on', Boolean(stopFeed) && !isError);
     }
 
-    reader.addEventListener('click', () => {
-        if (readerSession) {
-            stopReader();
-            window.setLocalizedText(readerStatus, 'Reader stopped.');
-            message('Reader stopped.');
-            return;
-        }
-        scanCursor = null;
-        readerSession = new AbortController();
-        window.setLocalizedText(reader, 'Stop RFID reader');
-        window.setLocalizedText(readerStatus, 'Connecting to the RFID scan feed...');
-        scanInput.focus();
-        scanInput.select();
-        message('RFID reader started.');
-        pollReader(readerSession);
-    });
+    function startReader() {
+        if (stopFeed) return;
+        stopFeed = window.startRfidFeed(addTags, setReaderStatus);
+        window.setLocalizedText(reader, 'Stop reader');
+    }
 
-    window.addEventListener('pagehide', stopReader);
+    function stopReader(text = 'Reader stopped.') {
+        stopFeed?.();
+        stopFeed = undefined;
+        window.setLocalizedText(reader, 'Start reader');
+        setReaderStatus(text, false);
+    }
+
+    reader.addEventListener('click', () => (stopFeed ? stopReader() : startReader()));
+    window.addEventListener('pagehide', () => stopFeed?.());
+
     function message(text, error = false) {
         window.showNotification(text, error);
     }
@@ -165,7 +121,7 @@
     function showMember(paidCents) {
         if (!member) return;
         // Same rule as complete_checkout(): 10 points per dollar paid, rounded down.
-        window.setLocalizedText(memberStatus, 'Member: {0} \u00b7 {1} points. This purchase earns {2} points.'
+        window.setLocalizedText(memberStatus, 'Member: {0} · {1} points. This purchase earns {2} points.'
             .replace('{0}', member.first_name).replace('{1}', member.points).replace('{2}', Math.floor(paidCents / 10)));
     }
 
@@ -192,49 +148,38 @@
     }
 
     function render() {
+        // Group the tags by product: 5 KitKat tags = one line "KitKat x 5".
+        cart = new Map();
+        for (const [epc, product] of tags) {
+            const line = cart.get(product.id) || {...product, quantity: 0, epcs: []};
+            line.quantity++;
+            line.epcs.push(epc);
+            cart.set(product.id, line);
+        }
+
         basket.replaceChildren();
         for (const product of cart.values()) {
             const row = document.createElement('tr');
-            const name = document.createElement('td');
-            name.textContent = product.name;
-
-            const quantityCell = document.createElement('td');
-            const quantity = document.createElement('input');
-            quantity.className = 'basket-quantity';
-            quantity.type = 'number';
-            quantity.min = '1';
-            quantity.max = String(Math.min(product.in_stock, 1000));
-            quantity.step = '1';
-            quantity.value = String(product.quantity);
-            quantity.disabled = busy || step !== null;
-            quantity.dataset.i18nAriaLabel = 'Quantity';
-            quantity.setAttribute('aria-label', window.translate('Quantity'));
-            quantity.addEventListener('change', () => {
-                const count = quantity.valueAsNumber;
-                if (!Number.isInteger(count) || count < 1 || count > Number(quantity.max)) {
-                    quantity.value = String(product.quantity);
-                    message('Enter a quantity between 1 and ' + quantity.max + '.', true);
-                    return;
-                }
-                product.quantity = count;
-                updateTotal();
-                message('Quantity updated.');
+            const cells = [product.name, String(product.quantity), '$' + Number(product.price).toFixed(2),
+                '$' + (Number(product.price) * product.quantity).toFixed(2)].map((text, index) => {
+                const cell = document.createElement('td');
+                cell.textContent = text;
+                if (index > 0) cell.className = 'numeric';
+                return cell;
             });
-            quantityCell.append(quantity);
+            row.append(...cells);
 
-            const price = document.createElement('td');
-            price.textContent = '$' + Number(product.price).toFixed(2);
-            row.append(name, quantityCell, price);
             const cell = document.createElement('td');
             const remove = document.createElement('button');
             remove.className = 'button';
-            window.setLocalizedText(remove, "Remove");
+            remove.type = 'button';
+            window.setLocalizedText(remove, 'Remove');
             remove.disabled = busy || step !== null;
             remove.onclick = () => {
-                cart.delete(product.id);
-                if (lastAutoAddedEpc && product.epc === lastAutoAddedEpc) {
-                    if (scanInput.value === lastAutoAddedEpc) scanInput.value = '';
-                    lastAutoAddedEpc = undefined;
+                // Taken out of the basket: the reader must not add these tags back.
+                for (const epc of product.epcs) {
+                    tags.delete(epc);
+                    ignoredTags.add(epc);
                 }
                 render();
                 message('Item removed.');
@@ -249,86 +194,8 @@
         pay.disabled = busy || !cart.size;
         pay.hidden = step !== null;
         reader.disabled = busy || step !== null;
-        scanInput.disabled = step !== null;
-        if (picker) picker.disabled = step !== null;
-    }
-    const picker = document.getElementById('checkout-product');
-    scanInput.addEventListener('input', () => { lastAutoAddedEpc = undefined; });
-    picker?.addEventListener('change', () => {
-        lastAutoAddedEpc = undefined;
-        scanInput.value = picker.value;
-        scanInput.focus();
-        scanInput.select();
-        if (picker.value) message('Product selected. Add it to your basket.');
-    });
-
-    const scanQueue = [];
-    let activeTypedCode;
-    let lastTypedCode;
-    let lastTypedAt = 0;
-
-    async function addQueuedScans() {
-        busy = true;
-        render();
-        try {
-            while (scanQueue.length && step === null) {
-                const code = scanQueue.shift();
-                activeTypedCode = code;
-                try {
-                    const response = await fetch('/api/products/lookup?code=' + encodeURIComponent(code));
-                    const result = await response.json();
-                    if (!response.ok) throw new Error(result.message);
-                    const product = result.product;
-                    const epc = product.epc?.trim().toUpperCase();
-                    const inputIsEpc = epc && code.toUpperCase() === epc;
-                    if (inputIsEpc && seenTags.has(epc)) {
-                        message('This RFID tag is already in your basket.');
-                        continue;
-                    }
-
-                    const quantity = (cart.get(product.id)?.quantity || 0) + 1;
-                    if (quantity > Math.min(product.in_stock, 1000)) {
-                        throw new Error('No more stock available for this product.');
-                    }
-                    if (inputIsEpc) seenTags.add(epc);
-                    cart.set(product.id, {...product, quantity});
-                    message('Item added.');
-                } catch (error) {
-                    if (!scanInput.value && !scanQueue.length) {
-                        scanInput.value = code;
-                        scanInput.select();
-                    }
-                    message(error.message || 'Scanner lookup unavailable. Please retry.', true);
-                }
-            }
-        } finally {
-            activeTypedCode = undefined;
-            busy = false;
-            render();
-        }
     }
 
-    document.getElementById('scan').onsubmit = event => {
-        event.preventDefault();
-        if (step !== null) return;
-        const code = scanInput.value.trim();
-        if (!code) return;
-        if (code.toUpperCase() === lastAutoAddedEpc) {
-            message('This RFID tag is already in your basket.');
-            scanInput.select();
-            return;
-        }
-
-        const now = Date.now();
-        scanInput.value = '';
-        if (picker) picker.value = '';
-        scanInput.focus();
-        if (code === activeTypedCode || code === scanQueue.at(-1) || (code === lastTypedCode && now - lastTypedAt < 700)) return;
-        lastTypedCode = code;
-        lastTypedAt = now;
-        scanQueue.push(code);
-        if (!busy) addQueuedScans();
-    };
     let previousPointsError;
     function pointsError() {
         if (!pointsInput || pointsInput.disabled || pointsInput.value === '') return;
@@ -439,12 +306,12 @@
         for (const [key, section] of Object.entries(steps)) section.hidden = key !== name;
         cashBox.hidden = true;
         render();
+        if (name === null) startReader(); // back to the basket: listen for items again
     }
 
     pay.addEventListener('click', () => {
         if (busy || !cart.size) return;
-        stopReader();
-        window.setLocalizedText(readerStatus, 'Reader stopped for payment.');
+        stopReader('Reader stopped for payment.');
         showStep('details');
         membership.focus();
         membership.select();
@@ -523,7 +390,7 @@
         }
         if (pointsInput && !pointsInput.disabled) body.set('redeem_points', String(Number(pointsInput.value)));
         body.set('payment_method', method);
-        body.set('items', JSON.stringify([...cart.values()].map(p => ({id:p.id, quantity:p.quantity}))));
+        body.set('epcs', JSON.stringify([...tags.keys()]));
         try {
             const response = await fetch('/checkout', {method:'POST',body});
             const result = await response.json();
@@ -547,5 +414,5 @@
     updateOrderForm();
     render();
     if (membership.value.trim() !== '') lookUpMember(); // signed-in member: card filled in already
-    document.getElementById('code').select();
+    startReader(); // like a store kiosk: listening as soon as the page opens
 })();

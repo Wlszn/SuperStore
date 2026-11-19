@@ -92,6 +92,7 @@ $routes = [
 
     // Phase 3: scanners (used by management and self-checkout)
     'GET /api/products/lookup' => [ProductController::class, 'lookup'],
+    'GET /api/items/lookup'    => [ProductController::class, 'itemLookup'],
     'POST /api/scans'          => [ScanApiController::class, 'store'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
 ];

@@ -5,13 +5,18 @@ namespace App\Models;
 
 use App\Services\SupaClient;
 use DateTimeImmutable;
+use InvalidArgumentException;
+use RuntimeException;
+use function config\supa_request;
 
+/** A delivery: the tagged items of one product type that came in on one date. */
 class ReceptionModel
 {
     private const TABLE = 'receptions';
     private const COLUMNS = 'id,product_id,quantity,received_at';
 
-    private const MAX_QUANTITY = 100000;
+    /** Most tags in one delivery (the same limit as one RFID read). */
+    private const MAX_TAGS = 100;
 
     /** Every reception of one product, newest first. */
     public function forProduct(int $productId, ?int $limit = null): array
@@ -25,12 +30,28 @@ class ReceptionModel
         return array_map([$this, 'normalize'], $rows);
     }
 
-    /** Record a reception. $data must come from validate(). Returns the new row. */
-    public function create(array $data): array
+    /**
+     * Record a delivery: every tag becomes one item of the product, in one transaction
+     * (receive_items() in config/checkout.sql). $data must come from validate(). Returns the reception.
+     *
+     * @throws InvalidArgumentException if a tag is already registered
+     * @throws RuntimeException if the database is unavailable
+     */
+    public function receive(array $data): array
     {
-        $rows = SupaClient::rows('POST', self::TABLE, null, $data);
+        [$status, $body] = supa_request('POST', 'rpc/receive_items', null, [
+            'p_product' => $data['product_id'],
+            'p_received' => $data['received_at'],
+            'p_epcs' => $data['epcs'],
+        ]);
+        if (($body['code'] ?? '') === 'PT422') {
+            throw new InvalidArgumentException($body['message']);
+        }
+        if ($status < 200 || $status >= 300 || !isset($body['id'])) {
+            throw new RuntimeException('The delivery was not saved.');
+        }
 
-        return $this->normalize($rows[0]);
+        return $this->normalize($body);
     }
 
     public function validate(array $input): array
@@ -42,9 +63,21 @@ class ReceptionModel
             $errors['product_id'] = 'Please choose a product.';
         }
 
-        $quantity = filter_var($input['quantity'] ?? null, FILTER_VALIDATE_INT);
-        if ($quantity === false || $quantity < 1 || $quantity > self::MAX_QUANTITY) {
-            $errors['quantity'] = sprintf('The quantity must be a whole number from 1 to %d.', self::MAX_QUANTITY);
+        // The tags the reader saw (epcs[] in the form): uppercase hex, no duplicates.
+        $epcs = [];
+        foreach (is_array($input['epcs'] ?? null) ? $input['epcs'] : [] as $epc) {
+            $epc = is_string($epc) ? strtoupper(str_replace(' ', '', trim($epc))) : '';
+            if (!preg_match('/^[0-9A-F]{1,24}$/', $epc)) {
+                $errors['epcs'] = 'Every tag must be up to 24 hexadecimal characters (0-9, A-F).';
+                break;
+            }
+            $epcs[$epc] = true;
+        }
+        $epcs = array_keys($epcs);
+        if (!isset($errors['epcs']) && $epcs === []) {
+            $errors['epcs'] = 'Place the new items on the RFID reader first.';
+        } elseif (count($epcs) > self::MAX_TAGS) {
+            $errors['epcs'] = sprintf('Receive at most %d tags at a time.', self::MAX_TAGS);
         }
 
         $today = new DateTimeImmutable('today');
@@ -59,8 +92,8 @@ class ReceptionModel
 
         $data = [
             'product_id' => (int) $productId,
-            'quantity' => (int) $quantity,
             'received_at' => $date ? $date->format('Y-m-d') : null,
+            'epcs' => $epcs,
         ];
 
         return [$data, $errors];
