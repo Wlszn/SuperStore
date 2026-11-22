@@ -12,6 +12,7 @@ use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
 use App\Controllers\ProductController;
 use App\Controllers\ScanApiController;
+use App\Controllers\SalesReportController;
 
 
 define('APP_ROOT', dirname(__DIR__));
@@ -95,6 +96,9 @@ $routes = [
     'GET /api/items/lookup'    => [ProductController::class, 'itemLookup'],
     'POST /api/scans'          => [ScanApiController::class, 'store'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
+
+    // Phase 4: reports (admin only)
+    'GET /api/reports/sales' => [SalesReportController::class, 'sales'],
 ];
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
