@@ -1,12 +1,21 @@
 {
     "name": "superstore/superstore",
     "description": "A smart-store simulation built for the Internet of Things course (420-521-VA, Vanier College) final project",
-    "type": "library",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
     "autoload": {
         "psr-4": {
-            "Superstore\\Superstore\\": "app/"
-        }
+            "App\\": "App/"
+        },
+        "classmap": [
+            "app/"
+        ]
     },
-    "minimum-stability": "alpha",
-    "require": {}
+    "config": {
+        "optimize-autoloader": true
+    }
 }
