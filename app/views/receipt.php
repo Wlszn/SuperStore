@@ -76,11 +76,13 @@ $purchasedAt = (new DateTimeImmutable($receipt['purchased_at']))->setTimezone(ne
     </footer>
 </article>
 
-<?php
-$estimate = $purchasedAt->modify('+3 days')->format('Y-m-d');
-require __DIR__ . '/products/_tracking.php';
-?>
-<script src="/assets/js/tracking.js" defer></script>
+<?php if (ORDER_TRACKING): ?>
+    <?php
+    $estimate = $purchasedAt->modify('+3 days')->format('Y-m-d');
+    require __DIR__ . '/products/_tracking.php';
+    ?>
+    <script src="/assets/js/tracking.js" defer></script>
+<?php endif; ?>
 
 
 <div class="heading-actions section-gap receipt-actions">

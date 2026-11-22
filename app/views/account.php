@@ -82,7 +82,7 @@ require __DIR__ . '/products/_start.php';
                 <tbody>
                     <?php foreach ($purchases as $purchase): ?>
                         <tr>
-                            <td><?= $e((new DateTimeImmutable($purchase['purchased_at']))->format('M j, Y H:i T')) ?></td>
+                            <td><?= $e((new DateTimeImmutable($purchase['purchased_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('M j, Y H:i')) ?></td>
                             <td><?= $money($purchase['total']) ?></td>
                             <td><?= $e($purchase['points_earned']) ?></td>
                             <td><span class="order-status" data-order-status="SS-<?= $e(str_pad((string) $purchase['id'], 6, '0', STR_PAD_LEFT)) ?>" data-i18n>In progress</span></td>
@@ -101,11 +101,13 @@ require __DIR__ . '/products/_start.php';
             <p class="empty"><span data-i18n>Your purchases will appear here.</span></p>
         <?php endif; ?>
     </section>
-    <section id="sample-orders" class="panel editor-body section-gap" hidden>
-        <h2 data-i18n>Online orders</h2>
-        <ul id="sample-order-list" class="order-list"></ul>
-    </section>
-    <script src="/assets/js/tracking.js" defer></script>
+    <?php if (ORDER_TRACKING): ?>
+        <section id="sample-orders" class="panel editor-body section-gap" hidden>
+            <h2 data-i18n>Online orders</h2>
+            <ul id="sample-order-list" class="order-list"></ul>
+        </section>
+        <script src="/assets/js/tracking.js" defer></script>
+    <?php endif; ?>
 
 <?php endif; ?>
 <?php require __DIR__ . '/products/_end.php'; ?>

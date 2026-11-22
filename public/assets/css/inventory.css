@@ -232,6 +232,18 @@ dialog .notice { margin: 14px 0 0; }
     margin-top: 12px;
 }
 .reader-controls .hint { margin: 0; }
+.reader-controls .hint.error { color: var(--red); }
+.reader-controls .button { margin-left: auto; }
+/* Green light while the RFID reader is listening (checkout and receive stock). */
+.reader-light { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #9aa4b1; }
+.reader-light.on { background: #2b7a78; animation: live-pulse 2s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .reader-light.on { animation: none; } }
+.items-panel { margin-bottom: 24px; }
+.tag-list { margin: 0; padding: 0; list-style: none; }
+.tag-list li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.tag-list li:first-child { border-top: 0; }
+.tag-list .code { flex: 1; overflow-wrap: anywhere; }
+.tag-list .tag-taken { color: var(--red); font-size: 12px; }
 .payment-panel { display: grid; gap: 10px; justify-items: start; }
 .payment-panel h2, .payment-panel .hint { margin: 0; }
 .checkbox-line { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
@@ -395,3 +407,87 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
 .checkout-details { width: 100%; max-width: 640px; margin-bottom: 8px; }
 
 #points-redemption .hint { margin-top: 4px; }
+
+/* Fridge dashboard (app/views/dashboard.php) */
+.fridge-grid, .fridge-overview { --ok: #2b7a78; --near: #b26b00; --over: #a62531; --idle: #8a94a3; }
+.live { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #9aa4b1; }
+.live.on .live-dot { background: #2b7a78; animation: live-pulse 2s ease-out infinite; }
+.live.off { color: var(--red); }
+.live.off .live-dot { background: var(--red); }
+@keyframes live-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(43, 122, 120, .45); }
+    70%, 100% { box-shadow: 0 0 0 7px rgba(43, 122, 120, 0); }
+}
+
+.fridge-overview {
+    --state: var(--idle);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px 24px;
+    margin-bottom: 20px;
+    padding: 14px 16px 14px 18px;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--state);
+    border-radius: 8px;
+}
+.fridge-overview[data-state="ok"] { --state: var(--ok); }
+.fridge-overview[data-state="near"] { --state: var(--near); background: #fffaf0; }
+.fridge-overview[data-state="over"], .fridge-overview[data-state="error"] { --state: var(--over); background: #fff6f7; }
+.fridge-overview > p { flex: 1 1 320px; max-width: 70ch; margin: 0; font-size: 15px; font-weight: 600; line-height: 1.45; }
+.fan-control { display: flex; align-items: center; gap: 12px; }
+.fan-icon { width: 36px; height: 36px; color: #a3acb8; }
+.fan-control.on .fan-icon { color: var(--blue); animation: fan-spin .9s linear infinite; }
+.fan-label { display: block; color: var(--muted); font-size: 12px; }
+.fan-control strong { font-size: 15px; }
+.fan-control .button { min-width: 84px; }
+@keyframes fan-spin { to { transform: rotate(360deg); } }
+
+.fridge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 20px; }
+.fridge { --state: var(--idle); padding: 18px 20px 20px; border: 1px solid var(--line); border-radius: 8px; }
+.fridge[data-state="ok"] { --state: var(--ok); }
+.fridge[data-state="near"] { --state: var(--near); }
+.fridge[data-state="over"] { --state: var(--over); border-color: #e9b8bf; box-shadow: inset 0 3px 0 var(--over); }
+.fridge-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fridge-head h2 { margin: 0; font-size: 17px; }
+.fridge-state { display: inline-flex; align-items: center; gap: 7px; color: var(--state); font-size: 13px; font-weight: 650; white-space: nowrap; }
+.fridge-state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--state); }
+
+.gauges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 16px 0 4px; }
+.gauge { margin: 0; text-align: center; }
+.gauge svg { display: block; width: 100%; max-width: 230px; height: auto; margin: 0 auto; overflow: visible; }
+.gauge-track, .gauge-fill { fill: none; stroke-width: 14; stroke-linecap: round; }
+.gauge-track { stroke: #edf0f4; }
+.gauge-fill {
+    stroke: var(--state);
+    stroke-dasharray: 100 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset .7s cubic-bezier(.2, .7, .2, 1), stroke .3s;
+}
+.humidity .gauge-fill { stroke: #4b6f9e; }
+.fridge[data-state="offline"] .gauge-fill { stroke: var(--idle); }
+.gauge-limit { stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
+.gauge-number { fill: var(--text); font-size: 38px; font-weight: 650; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.gauge-unit { fill: var(--muted); font-size: 14px; font-weight: 600; }
+.gauge-end { fill: #8a94a3; font-size: 11px; font-variant-numeric: tabular-nums; }
+.gauge figcaption { margin-top: 2px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.fridge-meta { margin: 10px 0 16px; color: var(--muted); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+
+.limit-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.limit-form label { margin-right: auto; font-size: 13px; font-weight: 600; }
+.limit-input { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.limit-input input { width: 86px; text-align: right; font-variant-numeric: tabular-nums; }
+.limit-input input[aria-invalid="true"] { border-color: var(--red); }
+
+@media (max-width: 420px) {
+    .fridge { padding: 16px 14px; }
+    .gauges { gap: 4px 8px; }
+    .fan-control { width: 100%; }
+    .fan-control .button { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .live.on .live-dot, .fan-control.on .fan-icon { animation: none; }
+    .gauge-fill { transition: none; }
+}

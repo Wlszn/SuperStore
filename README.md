@@ -34,10 +34,10 @@ The application has two sides:
 - Email alert when a fridge is too warm; replying **YES** turns the fan (DC motor) on
 
 **Phase 3: Store operations**
-- Product catalogue with UPC (barcode) and EPC (RFID tag)
-- Each product is defined once and received many times; stock is computed, never stored
-- Inventory with low-stock flags; barcode scanner and RFID reader support
-- Self-checkout: scan all items at once, membership card, payment simulation, points, emailed receipt (email requires the receipt worker)
+- Product types identified by their barcode (UPC), with a category from a fixed list and a producer: "KitKat 4 Finger 45g" by Nestle
+- Every physical item has its own RFID tag (EPC). Receiving stock = scan the type's barcode, put all the new items on the reader
+- Stock = tagged items not sold yet; low-stock flags
+- Self-checkout (RFID only): put everything on the reader, all items appear at once, grouped by type ("KitKat × 5"); membership card, payment simulation, points, emailed receipt (email requires the receipt worker)
 
 ## Tech Stack
 
@@ -97,7 +97,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ### 2. Database
 
-For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Apply `config/checkout.sql`, `config/membership.sql`, and `config/receipt_emails.sql` in that order. Those three files can also be applied to an existing Phase 3 database. Give your account admin access:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql` and `config/receipt_emails.sql`, in that order. Both are safe to run again on an existing database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -145,7 +145,7 @@ See the [demonstration guide](docs/Demonstration.md) for the delivery, scan, pay
 | Sensors and fan | `POST /api/readings`, `GET /api/readings/latest`, `GET/POST /api/fan` |
 | Products (admin) | `GET /products`, `/products/create`, `/products/edit`, `/products/show`, `/products/receive` |
 | Product actions (admin) | `POST /products`, `/products/update`, `/products/delete`, `/receptions` |
-| Scanners | `GET /api/products/lookup?code=`, `POST /api/scans`, `GET /api/scans/latest` |
+| Scanners | `GET /api/products/lookup?code=` (barcode), `GET /api/items/lookup?epcs=` (RFID tags), `POST /api/scans`, `GET /api/scans/latest` |
 
 Request and response formats: [`docs/API.md`](docs/API.md).
 
@@ -159,7 +159,7 @@ Design, relationships and examples: [`docs/ER.md`](docs/ER.md). Editable diagram
 
 | Component | Phase | Connection |
 |---|---|---|
-| Blue / red LEDs | 1 | GPIO 17 / GPIO 18 |
+| Blue / red LEDs | 1 | GPIO 23 / GPIO 18 |
 | 2 × ESP32 + DHT11 | 2 | Wi-Fi (MQTT) |
 | DC motor + driver | 2 | GPIO 22 (enable), 27 (in 1), 17 (in 2) |
 | USB barcode scanner | 3 | USB (keyboard mode) |

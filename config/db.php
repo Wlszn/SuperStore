@@ -40,8 +40,16 @@ function supa_request(string $method, string $path, ?array $query = null, ?array
         'Content-Type: application/json',
     ];
 
-    $ch = curl_init($url);
+    // One handle per PHP request: the next call reuses the open HTTPS connection
+    // to Supabase instead of doing a new TLS handshake every time.
+    static $ch = null;
+    if ($ch === null) {
+        $ch = curl_init();
+    } else {
+        curl_reset($ch);
+    }
     curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_HTTPHEADER => $headers,

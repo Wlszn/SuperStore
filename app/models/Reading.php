@@ -11,7 +11,6 @@ use RuntimeException;
 class Reading
 {
     private const TABLE = 'readings';
-    private const COLUMNS = 'id,fridge_id,temperature,humidity,recorded_at';
 
     // Generous limits: only reject values that can't be real sensor output.
     private const MIN_TEMP = -40.0;
@@ -43,35 +42,6 @@ class Reading
         }
 
         return $this->normalize($rows[0]);
-    }
-
-    /** Most recent reading of one fridge, or null if it has none yet. */
-    public function latestByFridge(int $fridgeId): ?array
-    {
-        $rows = SupaClient::rows('GET', self::TABLE, [
-            'select'    => self::COLUMNS,
-            'fridge_id' => 'eq.' . $fridgeId,
-            'order'     => 'recorded_at.desc',
-            'limit'     => 1,
-        ]);
-
-        return $rows ? $this->normalize($rows[0]) : null;
-    }
-
-    /**
-     * Latest reading of every fridge, keyed by fridge id (for the dashboard gauges).
-     * A fridge with no readings yet maps to null.
-     *
-     * @return array<int, array|null>
-     */
-    public function latestAll(): array
-    {
-        $latest = [];
-        foreach ((new Fridge())->all() as $fridge) {
-            $latest[$fridge['id']] = $this->latestByFridge($fridge['id']);
-        }
-
-        return $latest;
     }
 
     private function normalize(array $row): array

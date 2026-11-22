@@ -7,7 +7,6 @@ session_start();
 date_default_timezone_set('America/Toronto');
 
 use App\Controllers\AuthController;
-use App\Controllers\BarcodeController;
 use App\Controllers\ThresholdController;
 use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
@@ -16,6 +15,10 @@ use App\Controllers\ScanApiController;
 
 
 define('APP_ROOT', dirname(__DIR__));
+
+// Delivery and order tracking is only stored in the browser tab for now (nothing is
+// saved on the server), so it is switched off. Set to true to show it again.
+const ORDER_TRACKING = false;
 
 spl_autoload_register(function (string $class): void {
     $prefix = 'App\\';
@@ -49,7 +52,7 @@ function view(string $name): void
 
 $routes = [
     'POST /account/membership' => [App\Controllers\CheckoutController::class, 'membership'],
-    'GET /order-confirmation' => fn() => view('order-confirmation'),
+    'GET /order-confirmation' => fn() => ORDER_TRACKING ? view('order-confirmation') : header('Location: /account'),
     'GET /checkout' => [App\Controllers\CheckoutController::class, 'index'],
     'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
     'GET /api/members/lookup' => [App\Controllers\CheckoutController::class, 'memberLookup'],
@@ -59,13 +62,13 @@ $routes = [
 
     'GET /login' => fn() => view('login'),
     'GET /signup' => fn() => view('signup'),
-    'GET /dashboard' => fn() => header('Location: /'),
+    'GET /dashboard' => [ThresholdController::class, 'index'],
 
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],
     'GET /logout' => [AuthController::class, 'logout'],
 
-    'GET /thresholds' => [ThresholdController::class, 'index'],
+    'GET /thresholds' => fn() => header('Location: /dashboard'), // thresholds are edited on the dashboard
     'POST /thresholds' => [ThresholdController::class, 'update'],
     'GET /api/thresholds' => [ThresholdController::class, 'json'],
 
@@ -89,8 +92,8 @@ $routes = [
 
     // Phase 3: scanners (used by management and self-checkout)
     'GET /api/products/lookup' => [ProductController::class, 'lookup'],
+    'GET /api/items/lookup'    => [ProductController::class, 'itemLookup'],
     'POST /api/scans'          => [ScanApiController::class, 'store'],
-    'POST /api/barcode'       => [BarcodeController::class, 'processBarcode'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
 ];
 

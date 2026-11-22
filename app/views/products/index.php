@@ -46,7 +46,7 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
                     <td class="numeric"><?= $money($product['price']) ?></td>
                     <td class="numeric"><?= number_format($stock) ?></td>
                     <td><span data-i18n class="stock <?= $stock <= 0 ? 'out' : ($stock <= $lowStock ? 'low' : 'available') ?>"><?= $stock <= 0 ? 'Out of stock' : ($stock <= $lowStock ? 'Low stock' : 'In stock') ?></span></td>
-                    <td><div class="row-actions"><a href="/products/edit?id=<?= $id ?>"><span data-i18n>Edit</span></a><a href="/products/receive?id=<?= $id ?>"><span data-i18n>Receive</span></a><a href="/checkout?code=<?= $e(rawurlencode(($product['upc'] ?? '') !== '' ? $product['upc'] : ($product['epc'] ?? ''))) ?>"><span data-i18n>Open checkout</span></a></div></td>
+                    <td><div class="row-actions"><a href="/products/edit?id=<?= $id ?>"><span data-i18n>Edit</span></a><a href="/products/receive?id=<?= $id ?>"><span data-i18n>Receive</span></a></div></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>

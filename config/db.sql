@@ -56,20 +56,27 @@ ALTER TABLE customers
                                 DEFAULT ('SS' || nextval('membership_number_seq')),
   ADD COLUMN points           INT NOT NULL DEFAULT 0 CHECK (points >= 0);
 
+-- The categories the product form offers (a dropdown, not free text).
+CREATE TABLE categories (
+  name  VARCHAR(50) PRIMARY KEY
+);
+INSERT INTO categories (name) VALUES
+  ('Beverages'), ('Snacks'), ('Chocolate & candy'), ('Dairy'), ('Bakery'),
+  ('Frozen'), ('Produce'), ('Household'), ('Personal care');
+
+-- A product TYPE, identified by its barcode: "KitKat 4 Finger 45g" made by Nestle.
 CREATE TABLE products (
   id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name        VARCHAR(100)  NOT NULL,
-  category    VARCHAR(50)   NOT NULL,
+  category    VARCHAR(50)   NOT NULL REFERENCES categories(name) ON UPDATE CASCADE,
   price       NUMERIC(10,2) NOT NULL CHECK (price >= 0),
-  upc         VARCHAR(13)   UNIQUE,          -- barcode
-  epc         VARCHAR(24)   UNIQUE,          -- RFID tag, uppercase hex
+  upc         VARCHAR(13)   UNIQUE,          -- barcode of the type
   producer    VARCHAR(100)  NOT NULL,
   image_url   TEXT,
-  created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
-  CHECK (upc IS NOT NULL OR epc IS NOT NULL)
+  created_at  TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
 
---one product -> many receptions
+--one product -> many receptions (a delivery: how many tagged items came in, and when)
 CREATE TABLE receptions (
   id           INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   product_id   INT  NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -99,6 +106,17 @@ CREATE TABLE purchase_items (
 CREATE INDEX idx_purchase_items_purchase ON purchase_items (purchase_id);
 CREATE INDEX idx_purchase_items_product  ON purchase_items (product_id);
 
+-- One physical item = one RFID tag. Received with a delivery, sold with a purchase.
+-- An item is in stock while purchase_id is NULL.
+CREATE TABLE items (
+  id            INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  epc           VARCHAR(24) NOT NULL UNIQUE,   -- RFID tag, uppercase hex
+  product_id    INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  reception_id  INT REFERENCES receptions(id) ON DELETE CASCADE,
+  purchase_id   INT REFERENCES purchases(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_items_product ON items (product_id) WHERE purchase_id IS NULL;
+
 -- Tags read by the RFID reader
 CREATE TABLE rfid_scans (
   id          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -106,11 +124,10 @@ CREATE TABLE rfid_scans (
   scanned_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Stock = tagged items of this type that are not sold yet.
 CREATE VIEW product_stock WITH (security_invoker = true) AS
 SELECT p.*,
-       ( COALESCE((SELECT SUM(r.quantity) FROM receptions r     WHERE r.product_id = p.id), 0)
-       - COALESCE((SELECT SUM(i.quantity) FROM purchase_items i WHERE i.product_id = p.id), 0)
-       )::INT AS in_stock
+       (SELECT COUNT(*) FROM items i WHERE i.product_id = p.id AND i.purchase_id IS NULL)::INT AS in_stock
 FROM products p;
 
 ALTER TABLE products       ENABLE ROW LEVEL SECURITY;
@@ -118,14 +135,20 @@ ALTER TABLE receptions     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchases      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rfid_scans     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE items          ENABLE ROW LEVEL SECURITY;
 
--- Demo data. Replace the EPCs with the ones printed on the tags.
-INSERT INTO products (name, category, price, upc, epc, producer) VALUES
-  ('Coca-Cola 500ml',      'Beverage', 2.49, '0067000004117', 'E28011700000020A1B2C3D01', 'The Coca-Cola Company'),
-  ('Lay''s Classic 235g',  'Snacks',   4.99, '0060410013304', 'E28011700000020A1B2C3D02', 'Frito-Lay'),
-  ('Natrel 2% Milk 2L',    'Dairy',    5.29, '0068700011054', 'E28011700000020A1B2C3D03', 'Natrel');
+-- Demo data: 3 types and 6 tagged items. Replace the EPCs with the ones of your tags
+-- (or receive your own tags on the Receive stock page).
+INSERT INTO products (name, category, price, upc, producer) VALUES
+  ('Coca-Cola 500ml',      'Beverages',         2.49, '0067000004117', 'The Coca-Cola Company'),
+  ('KitKat 4 Finger 45g',  'Chocolate & candy', 1.79, '0059800000215', 'Nestle'),
+  ('Natrel 2% Milk 2L',    'Dairy',             5.29, '0068700011054', 'Natrel');
 
 INSERT INTO receptions (product_id, quantity, received_at) VALUES
-  (1, 24, CURRENT_DATE - 7), (1, 12, CURRENT_DATE),
-  (2, 10, CURRENT_DATE - 3),
-  (3,  4, CURRENT_DATE);
+  (1, 2, CURRENT_DATE - 7), (2, 3, CURRENT_DATE), (3, 1, CURRENT_DATE);
+
+INSERT INTO items (epc, product_id, reception_id) VALUES
+  ('E28011700000020A1B2C3D01', 1, 1), ('E28011700000020A1B2C3D02', 1, 1),
+  ('E28011700000020A1B2C3D03', 2, 2), ('E28011700000020A1B2C3D04', 2, 2), ('E28011700000020A1B2C3D05', 2, 2),
+  ('E28011700000020A1B2C3D06', 3, 3);

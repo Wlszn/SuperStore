@@ -25,7 +25,12 @@ require __DIR__ . '/_start.php';
                 <span data-error="name" class="field-error"></span>
             </label>
             <label><span data-i18n>Category</span>
-                <input name="category" required maxlength="50" value="<?= $e($product['category'] ?? '') ?>">
+                <select name="category" required>
+                    <option value="" data-i18n>Choose a category</option>
+                    <?php foreach ($categories as $category): ?>
+                        <option value="<?= $e($category) ?>" data-i18n <?= ($product['category'] ?? '') === $category ? 'selected' : '' ?>><?= $e($category) ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <span data-error="category" class="field-error"></span>
             </label>
             <label><span data-i18n>Producer</span>
@@ -43,22 +48,13 @@ require __DIR__ . '/_start.php';
         </div>
     </div>
     <div class="editor-body">
-        <h2><span data-i18n>Scanning codes</span></h2>
-        <p class="hint">Enter a UPC (8–13 digits) or an EPC. Focus the UPC field before scanning.</p>
+        <h2><span data-i18n>Barcode</span></h2>
+        <p class="hint"><span data-i18n>Click the field and scan the product's barcode. The barcode identifies this product; each item gets its own RFID tag when you receive stock.</span></p>
         <div class="fields">
             <label><span data-i18n>Barcode (UPC)</span>
-                <input id="product-upc" name="upc" class="code" inputmode="text" autocomplete="off" value="<?= $e($editing ? ($product['upc'] ?? '') : $prefill) ?>" data-upc-entry>
+                <input id="product-upc" name="upc" class="code" inputmode="text" autocomplete="off" required value="<?= $e($editing ? ($product['upc'] ?? '') : $prefill) ?>" data-upc-entry>
                 <span data-error="upc" class="field-error"></span>
             </label>
-            <div>
-                <label for="product-epc"><span data-i18n>RFID tag (EPC)</span>
-                    <input id="product-epc" name="epc" class="code" autocomplete="off" maxlength="24"
-                        value="<?= $e($product['epc'] ?? '') ?>" aria-describedby="epc-status">
-                    <span data-error="epc" class="field-error"></span>
-                </label>
-                <button class="button" type="button" id="capture-epc" data-i18n>Read EPC from reader</button>
-                <span id="epc-status" role="status" class="hint"></span>
-            </div>
         </div>
     </div>
     <div class="editor-footer">

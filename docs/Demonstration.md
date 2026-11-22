@@ -17,7 +17,7 @@ These tests used temporary records which were deleted and checked afterward.
 
 ## How checkout works
 
-The browser sends product IDs and quantities. PostgreSQL reads the current prices and checks stock. Product locks are acquired in ID order so simultaneous checkout requests cannot both spend the same stock. The purchase, receipt lines and points update happen in one transaction. Failure rolls back the transaction.
+The browser sends the RFID tags in the basket. PostgreSQL locks those items, checks that each one is in stock and reads the current prices, so two checkouts cannot sell the same item. The purchase, receipt lines and points update happen in one transaction. Failure rolls back the transaction.
 
 Each checkout has a request key. Retrying that key returns its original purchase. Receipt lines store product names and prices as they were at purchase time.
 
@@ -25,9 +25,11 @@ Prices are final CAD amounts for this classroom simulation. Ten points are earne
 
 ## RFID demonstration
 
-Start the reader feed before placing tagged products on the reader. The checkout reads new scan records in batches. A tag is counted once per basket, including when the reader reports it repeatedly. Removing an item prevents repeated reads from adding it again in that basket.
+Every physical item has its own tag. The checkout page starts listening as soon as it opens: put all the items on the reader and they appear together, grouped by product (five KitKats = one line "× 5"). A tag is counted once per basket, including when the reader reports it repeatedly. Removing a line prevents repeated reads from adding those items again. An unknown or already-sold tag is reported and not added. The scan feed assumes one station at a time.
 
-The current schema supports one EPC per product. Multiple individually tagged units of the same product require a separate tag-to-product table. Physical CF600 integration is pending the teacher-provided SDK. The scan feed currently assumes one checkout station.
+Without the reader, simulate one batch from PowerShell:
+
+    Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/scans -ContentType 'application/json' -Body '{"epcs":["E28011700000020A1B2C3D03","E28011700000020A1B2C3D04","E28011700000020A1B2C3D01"]}'
 
 ## Receipt email setup
 
@@ -48,7 +50,7 @@ SMTP delivery cannot guarantee exactly-once delivery. If a worker stops after SM
 - Real receipt delivery after email configuration and queue migration.
 - CF600 hardware and SDK integration.
 - Full French coverage. The language switch currently translates selected customer labels and messages.
-Apply config/membership.sql for card codes up to 64 characters. Re-run config/checkout.sql for the ten-points-per-dollar rule. Existing receipts keep their original points.
+Re-run config/checkout.sql for card codes up to 64 characters and the ten-points-per-dollar rule. Existing receipts keep their original points.
 
 
 ## Delivery-to-sale demo

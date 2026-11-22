@@ -9,7 +9,6 @@ $barcode = App\Services\Barcode::code128($upc);
 <header class="page-heading">
     <div><h1><?= $e($product['name']) ?></h1><p><?= $e($product['producer']) ?> · <?= $e($product['category']) ?></p></div>
     <div class="heading-actions">
-        <a class="button" href="/checkout?code=<?= $e(rawurlencode($upc !== '' ? $upc : ($product['epc'] ?? ''))) ?>"><span data-i18n>Open checkout</span></a>
         <a class="button" href="/products/edit?id=<?= $id ?>"><span data-i18n>Edit product</span></a>
         <a class="button primary" href="/products/receive?id=<?= $id ?>"><span data-i18n>Receive stock</span></a>
     </div>
@@ -19,7 +18,7 @@ $barcode = App\Services\Barcode::code128($upc);
     <div><dt><span data-i18n>In stock</span></dt><dd><?= number_format($product['in_stock']) ?></dd></div>
     <div><dt><span data-i18n>Unit price</span></dt><dd><?= $money($product['price']) ?></dd></div>
     <div><dt><span data-i18n>Barcode (UPC)</span></dt><dd class="code"><?= $e($product['upc'] ?? '—') ?></dd></div>
-    <div><dt><span data-i18n>RFID tag (EPC)</span></dt><dd class="code"><?= $e($product['epc'] ?? '—') ?></dd></div>
+    <div><dt><span data-i18n>Category</span></dt><dd class="code"><span data-i18n><?= $e($product['category']) ?></span></dd></div>
 </dl>
 
 <?php if ($upc !== ''): ?>
@@ -53,6 +52,23 @@ $barcode = App\Services\Barcode::code128($upc);
     </section>
 <?php endif; ?>
 
+<section class="panel items-panel" aria-labelledby="items-heading">
+    <div class="section-heading"><h2 id="items-heading"><span data-i18n>Items in stock</span></h2></div>
+    <?php if ($items === []): ?>
+        <p class="empty"><span data-i18n>No tagged items in stock. Receive stock to add some.</span></p>
+    <?php else: ?>
+        <div class="table-scroll compact" tabindex="0" role="region" aria-label="Items in stock" data-i18n-aria-label="Items in stock">
+            <table>
+                <thead><tr><th scope="col" data-i18n>RFID tag (EPC)</th><th scope="col" data-i18n>Delivery reference</th></tr></thead>
+                <tbody>
+                    <?php foreach ($items as $item): ?>
+                        <tr><td class="code"><?= $e($item['epc']) ?></td><td class="code"><?= $item['reception_id'] === null ? '—' : 'DEL-' . (int) $item['reception_id'] ?></td></tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+</section>
 
 <section class="panel" aria-labelledby="history-heading">
     <div class="section-heading"><h2 id="history-heading"><span data-i18n>Reception history</span></h2></div>
@@ -79,7 +95,7 @@ $barcode = App\Services\Barcode::code128($upc);
         <input type="hidden" name="id" value="<?= $id ?>">
         <div class="editor-body">
             <h2 id="delete-title" data-i18n><span data-i18n>Delete</span> <?= $e($product['name']) ?>?</h2>
-            <p class="hint"><span data-i18n>This permanently removes the product and its reception history.</span></p>
+            <p class="hint"><span data-i18n>This permanently removes the product, its items in stock and its reception history.</span></p>
             <div class="notice" role="alert" tabindex="-1" hidden></div>
         </div>
         <div class="editor-footer">

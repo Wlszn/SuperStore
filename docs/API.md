@@ -18,13 +18,14 @@ Each page receives the variables listed, plus `$csrfToken`. Until a view exists,
 | Route | View | Variables |
 |---|---|---|
 | `GET /products` | `products/index.php` | `$products`, `$lowStock` |
-| `GET /products/create` | `products/form.php` | `$product = null` |
-| `GET /products/edit?id=5` | `products/form.php` | `$product` |
-| `GET /products/show?id=5` | `products/show.php` | `$product`, `$receptions` |
+| `GET /products/create` | `products/form.php` | `$product = null`, `$categories` |
+| `GET /products/edit?id=5` | `products/form.php` | `$product`, `$categories` |
+| `GET /products/show?id=5` | `products/show.php` | `$product`, `$items` (tags in stock), `$receptions` |
 | `GET /products/receive?id=5` | `products/receive.php` | `$products`, `$selectedId` (may be null), `$today` |
 
-- Product: `id, name, category, price, upc, epc, producer, image_url, in_stock, low_stock`
-- Reception: `id, product_id, quantity, received_at`
+- Product (a type): `id, name, category, price, upc, producer, image_url, in_stock, low_stock`
+- Item (one RFID tag): `epc, product_id, reception_id, purchase_id` (in stock while `purchase_id` is null)
+- Reception (a delivery): `id, product_id, quantity, received_at`
 
 ### Actions
 
@@ -32,10 +33,10 @@ Every form sends `csrf_token`.
 
 | Route | Fields |
 |---|---|
-| `POST /products` | `name, category, price, upc, epc, producer, image_url` (UPC or EPC required) |
+| `POST /products` | `name, category` (one of the `categories` table), `price, upc` (required), `producer, image_url` |
 | `POST /products/update` | `id` + the same fields |
 | `POST /products/delete` | `id` |
-| `POST /receptions` | `product_id, quantity, received_at` (`YYYY-MM-DD`, empty = today) |
+| `POST /receptions` | `product_id, received_at` (`YYYY-MM-DD`, empty = today), `epcs[]` = the new tags on the reader (one item each) |
 
 Barcodes: a 12-digit UPC-A is stored as 13 digits (leading `0`), and the check digit is verified.
 
@@ -43,12 +44,13 @@ Barcodes: a 12-digit UPC-A is stored as 13 digits (leading `0`), and the check d
 
 | Route | Description |
 |---|---|
-| `GET /api/products/lookup?code=` | Product with this UPC or EPC, or `404`. |
+| `GET /api/products/lookup?code=` | Product type with this barcode (UPC), or `404`. |
+| `GET /api/items/lookup?epcs=A,B,C` | Every tag with its `status` (`in_stock`, `sold` or `unknown`) and `product`, in one request. |
 | `POST /api/scans` | `{"epc": "E280..."}` or `{"epcs": ["E280...", "E280..."]}`, sent by the RFID reader script. |
 | `GET /api/scans/latest` | The newest scan and its `last_id`. |
 | `GET /api/scans/latest?after=12` | Every scan newer than `12`, oldest first, and the new `last_id`. |
 
-Browser checkout accepts keyboard-mode barcode scans in the focused field. The standalone scanner script sends a code to `POST /api/barcode` as `{"barcode": "0123456789012"}` for its own session cart. Payment and points for browser checkout are handled by `POST /checkout`.
+Self-checkout is RFID only: the page listens to `/api/scans/latest`, looks every new batch up with `/api/items/lookup` and groups the tags by product. `POST /checkout` sends `epcs` (a JSON list of the tags in the basket); the `complete_checkout()` function in `config/checkout.sql` checks that every tag is in stock, saves the receipt, marks the items sold and updates the points in one transaction.
 
 ## Fridges and fan
 

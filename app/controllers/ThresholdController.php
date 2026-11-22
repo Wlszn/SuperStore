@@ -8,10 +8,10 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * Per-fridge temperature thresholds.
+ * Fridge dashboard and per-fridge temperature thresholds.
  *
- *   GET  /thresholds      settings page (login required)
- *   POST /thresholds      save one fridge's threshold (login + CSRF token required)
+ *   GET  /dashboard       live gauges, fan and each fridge's threshold (managers only)
+ *   POST /thresholds      save one fridge's threshold (managers only, CSRF token required)
  *   GET  /api/thresholds  thresholds as JSON (read by the alert service on the Pi)
  */
 class ThresholdController
@@ -23,11 +23,11 @@ class ThresholdController
         $this->fridges = new Fridge();
     }
 
-    /** GET /thresholds: render the settings page. */
+    /** GET /dashboard: render the fridge dashboard. The readings are loaded by JavaScript. */
     public function index(): void
     {
-        if (!$this->isLoggedIn()) {
-            header('Location: /login');
+        if (!$this->isAdmin()) {
+            header('Location: /');
             exit;
         }
 
@@ -40,8 +40,10 @@ class ThresholdController
         }
 
         $csrfToken = $this->csrfToken();
-        
-        require APP_ROOT . '/app/views/thresholds.php';
+        $title = 'Fridges';
+        $section = 'fridges';
+
+        require APP_ROOT . '/app/views/dashboard.php';
     }
 
     /** GET /api/thresholds: all fridges with their current threshold. */
@@ -63,8 +65,8 @@ class ThresholdController
     /** POST /thresholds: change one fridge's threshold. */
     public function update(): void
     {
-        if (!$this->isLoggedIn()) {
-            $this->respond(401, ['status' => 'error', 'message' => 'Please sign in first.']);
+        if (!$this->isAdmin()) {
+            $this->respond(403, ['status' => 'error', 'message' => 'Only managers can change the thresholds.']);
             return;
         }
 
@@ -129,9 +131,9 @@ class ThresholdController
         ]);
     }
 
-    private function isLoggedIn(): bool
+    private function isAdmin(): bool
     {
-        return isset($_SESSION['customer_id']);
+        return isset($_SESSION['customer_id']) && !empty($_SESSION['is_admin']);
     }
 
     /** One random token per session; the page sends it back with every save. */

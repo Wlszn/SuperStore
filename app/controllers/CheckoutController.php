@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use App\Models\ProductModel;
+use App\Models\ScanModel;
 use App\Services\SupaClient;
 use RuntimeException;
 use function config\supa_request;
@@ -15,8 +15,6 @@ class CheckoutController
     {
         $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
         $_SESSION['checkout_key'] ??= bin2hex(random_bytes(32));
-        $scanCode = $_GET['code'] ?? '';
-        $scanCode = is_string($scanCode) && mb_strlen($scanCode) <= 24 ? $scanCode : '';
         $profile = [];
         $membershipCode = '';
         $membershipUnavailable = false;
@@ -34,14 +32,6 @@ class CheckoutController
             } catch (RuntimeException $e) {
                 $membershipUnavailable = true;
             }
-        }
-
-        try {
-            $products = (new ProductModel())->all();
-            $catalogUnavailable = false;
-        } catch (RuntimeException $e) {
-            $products = [];
-            $catalogUnavailable = true;
         }
 
         require APP_ROOT . '/app/views/checkout.php';
@@ -66,23 +56,15 @@ class CheckoutController
             ]);
             return;
         }
-        $items = json_decode($_POST['items'] ?? '', true);
-        if (!is_array($items) || !array_is_list($items) || count($items) < 1 || count($items) > 100) {
+        // The basket is the list of RFID tags the reader saw: one tag = one item.
+        $epcs = json_decode($_POST['epcs'] ?? '', true);
+        [$epcs, $errors] = (new ScanModel())->validate(is_array($epcs) ? array_values($epcs) : []);
+        if ($errors !== []) {
             jsonResponse(422, [
                 'status' => 'error',
-                'message' => 'Add between 1 and 100 products.',
+                'message' => 'Place between 1 and 100 items on the reader.',
             ]);
             return;
-        }
-        foreach ($items as $item) {
-            if (!is_array($item) || !is_int($item['id'] ?? null) || $item['id'] < 1 ||
-                !is_int($item['quantity'] ?? null) || $item['quantity'] < 1 || $item['quantity'] > 1000) {
-                jsonResponse(422, [
-                    'status' => 'error',
-                    'message' => 'Invalid product or quantity.',
-                ]);
-                return;
-            }
         }
         $points = filter_var($_POST['redeem_points'] ?? 0, FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 0, 'max_range' => 2147483647],
@@ -113,31 +95,25 @@ class CheckoutController
                 }
                 $customerId = $members[0]['id'];
             }
-            $payload = [
+            if ($points > 0 && (!isset($_SESSION['customer_id']) || (int) $customerId !== (int) $_SESSION['customer_id'])) {
+                jsonResponse(403, ['status' => 'error', 'message' => 'Use your own membership to spend points.']);
+                return;
+            }
+            // complete_checkout() in config/checkout.sql: checks every tag, saves the receipt,
+            // marks the items sold and updates the points, all in one transaction.
+            [$status, $receipt] = supa_request('POST', 'rpc/complete_checkout', null, [
                 'p_key' => $key,
                 'p_customer' => $customerId,
-                'p_items' => $items,
-            ];
-            if ($points > 0) {
-                if (!isset($_SESSION['customer_id']) || (int) $customerId !== (int) $_SESSION['customer_id']) {
-                    jsonResponse(403, ['status' => 'error', 'message' => 'Use your own membership to spend points.']);
-                    return;
-                }
-                $payload['p_redeem_points'] = $points;
-                [$status, $receipt] = supa_request('POST', 'rpc/complete_checkout', null, $payload);
-                if (($receipt['code'] ?? '') === 'PGRST202') {
-                    jsonResponse(503, ['status' => 'error', 'message' => 'Points discounts are not available yet. Clear the points field to continue.']);
-                    return;
-                }
-                if ($status === 422 && ($receipt['code'] ?? '') === 'PT422') {
-                    jsonResponse(422, ['status' => 'error', 'message' => $receipt['message']]);
-                    return;
-                }
-                if ($status < 200 || $status >= 300 || !isset($receipt['id'])) {
-                    throw new RuntimeException('Checkout failed.');
-                }
-            } else {
-                $receipt = SupaClient::rows('POST', 'rpc/complete_checkout', null, $payload);
+                'p_epcs' => $epcs,
+                'p_redeem_points' => $points,
+            ]);
+            if (($receipt['code'] ?? '') === 'PT422') {
+                // A clear reason: a tag already sold, not enough points...
+                jsonResponse(422, ['status' => 'error', 'message' => $receipt['message']]);
+                return;
+            }
+            if ($status < 200 || $status >= 300 || !isset($receipt['id'])) {
+                throw new RuntimeException('Checkout failed.');
             }
             if ($method === 'cash') {
                 // 'card' is the column default. The purchase is already saved, so a failure here
@@ -156,7 +132,7 @@ class CheckoutController
         } catch (RuntimeException $error) {
             jsonResponse(409, [
                 'status' => 'error',
-                'message' => 'Payment could not be confirmed. Stock may have changed or the database may be unavailable. Retry with the same basket to safely check the result.',
+                'message' => 'Payment could not be confirmed. The database may be unavailable. Retry with the same basket to safely check the result.',
             ]);
         }
     }

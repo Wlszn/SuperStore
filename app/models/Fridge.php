@@ -30,6 +30,36 @@ class Fridge
         return array_map([$this, 'normalize'], $rows);
     }
 
+    /**
+     * All fridges with their newest reading, in ONE request: Supabase embeds the
+     * readings through the fridge_id foreign key and keeps only the newest one.
+     * 'reading' is null for a fridge that has not sent anything yet.
+     */
+    public function allWithLatestReading(): array
+    {
+        $rows = SupaClient::rows('GET', self::TABLE, [
+            'select'         => self::COLUMNS . ',readings(id,temperature,humidity,recorded_at)',
+            'order'          => 'id.asc',
+            'readings.order' => 'recorded_at.desc',
+            'readings.limit' => 1,
+        ]);
+
+        return array_map(function (array $row): array {
+            $reading = $row['readings'][0] ?? null;
+            unset($row['readings']);
+
+            $row = $this->normalize($row);
+            $row['reading'] = $reading === null ? null : [
+                'id'          => (int) $reading['id'],
+                'temperature' => (float) $reading['temperature'],
+                'humidity'    => (float) $reading['humidity'],
+                'recorded_at' => $reading['recorded_at'],
+            ];
+
+            return $row;
+        }, $rows);
+    }
+
     /** One fridge by id, or null if it doesn't exist. */
     public function find(int $id): ?array
     {

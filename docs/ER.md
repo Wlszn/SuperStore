@@ -9,12 +9,14 @@ Editable source: [`SuperStore-ERD.drawio`](SuperStore-ERD.drawio) (open it at ap
 | Table | One row is… | Used by |
 |---|---|---|
 | `customers` | One account (customer or admin), with membership number and points | Login, self-checkout |
-| `products` | One product, defined once | Management, self-checkout |
-| `receptions` | One delivery of a product (quantity + date) | Management |
+| `categories` | One category the product form offers | Management |
+| `products` | One product type, identified by its barcode ("KitKat 4 Finger 45g") | Management, self-checkout |
+| `items` | One physical item = one RFID tag; sold when `purchase_id` is set | Management, self-checkout |
+| `receptions` | One delivery of a product (how many tagged items, and the date) | Management |
 | `purchases` | One checkout, which is one receipt | Self-checkout |
 | `purchase_items` | One line on a receipt (product, quantity, price) | Self-checkout |
 | `rfid_scans` | One tag read by the RFID reader | Management, self-checkout |
-| `product_stock` *(view)* | A product with its computed `in_stock` | Management |
+| `product_stock` *(view)* | A product with its `in_stock` = its items not sold yet | Management |
 
 ## Relationships
 
@@ -27,7 +29,11 @@ Editable source: [`SuperStore-ERD.drawio`](SuperStore-ERD.drawio) (open it at ap
 | 3 | Product → Purchase items | 1 product : 0..many items (an item has 0 or 1 product) | `purchase_items.product_id → products.id` (nullable) | Product deleted → `SET NULL` |
 | 4 | Product → Receptions | 1 product : 0..many receptions | `receptions.product_id → products.id` | Product deleted → `CASCADE` |
 | 5 | **Customer ↔ Product** | **many : many**, through purchases and purchase items | *(no direct key)* | — |
-| 6 | RFID scan ⇢ Product | Matched by value, not a key | `rfid_scans.epc = products.epc` | — |
+| 6 | RFID scan ⇢ Item | Matched by value, not a key | `rfid_scans.epc = items.epc` | — |
+| 7 | Product → Items | 1 product : 0..many items (one per tag) | `items.product_id → products.id` | Product deleted → `CASCADE` |
+| 8 | Reception → Items | 1 delivery : 1..many items | `items.reception_id → receptions.id` | Reception deleted → `CASCADE` |
+| 9 | Purchase → Items | 1 purchase : 1..many items sold | `items.purchase_id → purchases.id` (null = in stock) | Purchase deleted → `SET NULL` (back in stock) |
+| 10 | Category → Products | 1 category : 0..many products | `products.category → categories.name` | Renamed category → `ON UPDATE CASCADE` |
 
 ### 1. Customers and purchases (one-to-many, optional)
 
@@ -98,17 +104,25 @@ customers 1 ──< purchases 1 ──< purchase_items >── 1 products
 
 ### 6. RFID scans and products (matched by value)
 
-`rfid_scans` has no foreign key on purpose. The reader records every tag it sees, including tags no product uses yet, for example a new item about to be registered. A foreign key would reject those scans. Pages match a scan to a product with `GET /api/products/lookup?code=<epc>`.
+`rfid_scans` has no foreign key on purpose. The reader records every tag it sees, including tags no item uses yet, for example a new item about to be received. A foreign key would reject those scans. Pages match a batch of scans to items with `GET /api/items/lookup?epcs=...`.
+
+### 7. Products, items, receptions and purchases (one tag = one item)
+
+A product is a **type**: the barcode identifies it, and it holds the name, category, price and producer. Each physical item of that type has its own RFID tag and is one row of `items`:
+
+- **Receiving stock** (`receive_items()` in `config/checkout.sql`) creates one reception and one item per new tag, in one transaction. A tag that is already registered is refused.
+- **Checkout** (`complete_checkout()`) takes the list of tags the reader saw. It checks that every tag is an item in stock, writes one receipt line per type (`KitKat 4 Finger 45g × 5`), and sets `purchase_id` on those items, in one transaction.
+- **Stock** (`product_stock`) is the number of items of the type with `purchase_id IS NULL`, so it is never stored and can't drift.
 
 ## Example
 
-Will (membership card **SS100003**) buys 2 Coca-Cola and 1 bag of Lay's. Then a guest without a card buys a carton of milk.
+Will (membership card **SS100003**) puts 2 Coca-Cola and 3 KitKats on the reader at once: 5 tags, 5 items. Then a guest without a card buys a carton of milk.
 
 **purchases**
 
 | id | customer_id | total | points_earned |
 |---|---|---|---|
-| 1 | 3 (Will) | 9.97 | 9 |
+| 1 | 3 (Will) | 10.35 | 103 |
 | 2 | NULL (guest) | 5.29 | 0 |
 
 **purchase_items**
@@ -116,12 +130,12 @@ Will (membership card **SS100003**) buys 2 Coca-Cola and 1 bag of Lay's. Then a 
 | id | purchase_id | product_id | name | unit_price | quantity |
 |---|---|---|---|---|---|
 | 1 | 1 | 1 | Coca-Cola 500ml | 2.49 | 2 |
-| 2 | 1 | 2 | Lay's Classic 235g | 4.99 | 1 |
+| 2 | 1 | 2 | KitKat 4 Finger 45g | 1.79 | 3 |
 | 3 | 2 | 3 | Natrel 2% Milk 2L | 5.29 | 1 |
 
-**Stock:** Coca-Cola was received twice (24 + 12 = 36) and 2 were sold, so `in_stock` is **34**.
+**Items:** the 5 tags now have `purchase_id = 1`. Coca-Cola had 2 tagged items in stock, both sold, so its `in_stock` is **0**.
 
-**If Coca-Cola is then deleted:** its 2 receptions are deleted (`CASCADE`). Line 1 of Will's receipt stays, still reading "Coca-Cola 500ml × 2 at $2.49", with `product_id = NULL` (`SET NULL`).
+**If Coca-Cola is then deleted:** its receptions and items are deleted (`CASCADE`). Line 1 of Will's receipt stays, still reading "Coca-Cola 500ml × 2 at $2.49", with `product_id = NULL` (`SET NULL`).
 
 ## Queries that use the relationships
 
@@ -154,8 +168,10 @@ SELECT name, in_stock FROM product_stock ORDER BY name;
 
 | Rule | Enforced by |
 |---|---|
-| Every UPC and every EPC points to one product only | `UNIQUE (upc)`, `UNIQUE (epc)` |
-| A product has a UPC or an EPC (or both) | `CHECK (upc IS NOT NULL OR epc IS NOT NULL)` |
+| Every barcode points to one product type only | `UNIQUE (products.upc)` |
+| Every RFID tag is one item only | `UNIQUE (items.epc)` |
+| A product's category is one of the list | Foreign key `products.category → categories.name` |
+| An item is sold at most once | `complete_checkout()` locks the items and only sells those with `purchase_id IS NULL` |
 | A reception is for a product that exists | Foreign key `receptions.product_id` |
 | A received or sold quantity is positive | `CHECK (quantity > 0)` |
 | Prices, totals and points are never negative | `CHECK (... >= 0)` |

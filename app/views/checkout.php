@@ -7,33 +7,16 @@ require __DIR__ . '/products/_start.php';
 <header class="page-heading">
     <div>
         <h1><span data-i18n>Self-checkout</span></h1>
-        <p><span data-i18n>Scan your products, review your basket, then simulate payment.</span></p>
+        <p><span data-i18n>Place all your items on the reader. They appear in your basket at once.</span></p>
     </div>
-    <a class="button" href="/account"><span data-i18n>My account</span></a>
-</header>
-<form id="scan" class="panel editor-body scan-line">
-    <?php if ($products): ?>
-        <label class="checkout-picker" for="checkout-product">
-            <span data-i18n>Choose a product</span>
-            <select id="checkout-product">
-                <option value="" data-i18n>Choose a product</option>
-                <?php foreach ($products as $product): ?>
-                    <?php $productCode = ($product['upc'] ?? '') !== '' ? $product['upc'] : ($product['epc'] ?? ''); ?>
-                    <?php if ($productCode === '') continue; ?>
-                    <option value="<?= $e($productCode) ?>"><?= $e($product['name'] . ' · ' . $productCode) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-    <?php elseif ($catalogUnavailable): ?>
-        <p class="hint checkout-picker" data-i18n>The product list is unavailable. Try scanning or entering a code.</p>
+    <?php if (isset($_SESSION['customer_id'])): ?>
+        <a class="button" href="/account"><span data-i18n>My account</span></a>
     <?php endif; ?>
-    <label for="code"><span data-i18n>UPC or EPC</span></label>
-    <input id="code" value="<?= $e($scanCode) ?>" autocomplete="off" required autofocus maxlength="24">
-    <button class="button"><span data-i18n>Add item</span></button>
-</form>
-<div class="reader-controls">
-    <button type="button" class="button" id="reader"><span data-i18n>Start RFID reader</span></button>
-    <p id="reader-status" role="status" class="hint"><span data-i18n>Run the RFID bridge, then start listening before placing products on the reader.</span></p>
+</header>
+<div class="panel editor-body reader-controls">
+    <span class="reader-light" id="reader-light" aria-hidden="true"></span>
+    <p id="reader-status" role="status" class="hint"><span data-i18n>Connecting to the RFID reader...</span></p>
+    <button type="button" class="button" id="reader"><span data-i18n>Stop reader</span></button>
 </div>
 <section class="panel section-gap">
     <div class="table-scroll compact" tabindex="0" role="region" aria-label="Shopping basket" data-i18n-aria-label="Shopping basket">
@@ -41,8 +24,9 @@ require __DIR__ . '/products/_start.php';
             <thead>
                 <tr>
                     <th><span data-i18n>Product</span></th>
-                    <th><span data-i18n>Quantity</span></th>
-                    <th><span data-i18n>Unit price</span></th>
+                    <th class="numeric"><span data-i18n>Quantity</span></th>
+                    <th class="numeric"><span data-i18n>Unit price</span></th>
+                    <th class="numeric"><span data-i18n>Amount</span></th>
                     <th><span data-i18n>Action</span></th>
                 </tr>
             </thead>
@@ -50,7 +34,7 @@ require __DIR__ . '/products/_start.php';
             </tbody>
         </table>
     </div>
-    <p class="empty" id="empty"><span data-i18n>Your basket is empty.</span></p>
+    <p class="empty" id="empty"><span data-i18n>Your basket is empty. Place your items on the reader.</span></p>
 </section>
 <form id="payment" class="panel editor-body section-gap payment-panel" novalidate>
     <input type="hidden" name="csrf_token" value="<?= $e($_SESSION['csrf_token']) ?>">
@@ -77,7 +61,7 @@ require __DIR__ . '/products/_start.php';
                 <p id="points-available" class="hint" data-i18n><?= (int) ($profile['points'] ?? 0) ?> points available</p>
             </div>
         <?php endif; ?>
-        <label class="checkbox-line"><input type="checkbox" id="deliver-order"> <span data-i18n>Deliver this order (optional)</span></label>
+        <label class="checkbox-line" <?= ORDER_TRACKING ? '' : 'hidden' ?>><input type="checkbox" id="deliver-order"> <span data-i18n>Deliver this order (optional)</span></label>
         <h2 data-i18n id="delivery-heading" hidden>Contact and delivery</h2>
         <div class="fields checkout-details" id="delivery-details" hidden>
             <label><span data-i18n>Full name</span>

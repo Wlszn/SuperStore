@@ -3,34 +3,40 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Models\ItemModel;
 use App\Models\ProductModel;
 use App\Models\ReceptionModel;
+use App\Models\ScanModel;
+use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * Product management and inventory. Every page and action is admin only,
- * except the lookup API, which the self-checkout uses.
+ * Product types, tagged items and inventory. Every page and action is admin only,
+ * except the two lookup APIs, which the self-checkout uses.
  *
- *   GET  /products                   inventory dashboard          (page)
- *   GET  /products/create            empty product form           (page)
- *   GET  /products/edit?id=5         product form, filled in      (page)
- *   GET  /products/show?id=5         details + reception history  (page)
- *   GET  /products/receive[?id=5]    receive-stock form           (page)
- *   POST /products                   create a product             (JSON)
- *   POST /products/update            edit a product               (JSON)
- *   POST /products/delete            delete a product             (JSON)
- *   POST /receptions                 record received stock        (JSON)
- *   GET  /api/products/lookup?code=  find a product by UPC or EPC (JSON)
+ *   GET  /products                     inventory dashboard                 (page)
+ *   GET  /products/create              empty product form                  (page)
+ *   GET  /products/edit?id=5           product form, filled in             (page)
+ *   GET  /products/show?id=5           details, tags in stock, deliveries  (page)
+ *   GET  /products/receive[?id=5]      receive tagged items                (page)
+ *   POST /products                     create a product type               (JSON)
+ *   POST /products/update              edit a product type                 (JSON)
+ *   POST /products/delete              delete a product type               (JSON)
+ *   POST /receptions                   record a delivery of tagged items   (JSON)
+ *   GET  /api/products/lookup?code=    product type by barcode (UPC)       (JSON)
+ *   GET  /api/items/lookup?epcs=A,B    what each RFID tag is               (JSON)
  */
 class ProductController
 {
     private ProductModel $products;
     private ReceptionModel $receptions;
+    private ItemModel $items;
 
     public function __construct()
     {
         $this->products = new ProductModel();
         $this->receptions = new ReceptionModel();
+        $this->items = new ItemModel();
     }
 
     /** GET /products: every product with its stock. */
@@ -60,7 +66,7 @@ class ProductController
             return;
         }
 
-        $this->render('products/form', ['product' => null]);
+        $this->renderForm(null);
     }
 
     // GET /products/edit?id=5: the same form, filled in
@@ -72,11 +78,11 @@ class ProductController
 
         $product = $this->productFromQuery();
         if ($product !== null) {
-            $this->render('products/form', ['product' => $product]);
+            $this->renderForm($product);
         }
     }
 
-    // GET /products/show?id=5: one product and every time it was received
+    // GET /products/show?id=5: one product, its tags in stock and every delivery
     public function show(): void
     {
         if (!$this->allowPage()) {
@@ -90,12 +96,13 @@ class ProductController
 
         try {
             $receptions = $this->receptions->forProduct($product['id']);
+            $items = $this->items->inStock($product['id']);
         } catch (RuntimeException $e) {
             $this->pageError(500, 'Could not load the reception history. Please try again.');
             return;
         }
 
-        $this->render('products/show', ['product' => $product, 'receptions' => $receptions]);
+        $this->render('products/show', ['product' => $product, 'receptions' => $receptions, 'items' => $items]);
     }
 
     // GET /products/receive[?id=5]: pick a product (pre-selected when id is given)
@@ -233,7 +240,7 @@ class ProductController
         ]);
     }
 
-    /** POST /receptions: record a delivery (product_id, quantity, received_at). */
+    /** POST /receptions: record a delivery (product_id, received_at, epcs[] = the tags on the reader). */
     public function receive(): void
     {
         if (!$this->allowAction()) {
@@ -241,6 +248,11 @@ class ProductController
         }
 
         [$data, $errors] = $this->receptions->validate($_POST);
+        if (isset($errors['epcs'])) {
+            // No field to highlight for the tags: the message itself says what to do.
+            jsonResponse(422, ['status' => 'error', 'message' => $errors['epcs'], 'errors' => $errors]);
+            return;
+        }
         if ($errors !== []) {
             $this->invalid($errors);
             return;
@@ -252,8 +264,11 @@ class ProductController
                 return;
             }
 
-            $reception = $this->receptions->create($data);
+            $reception = $this->receptions->receive($data);
             $product = $this->products->find($data['product_id']); // fresh stock
+        } catch (InvalidArgumentException $e) {
+            jsonResponse(422, ['status' => 'error', 'message' => $e->getMessage()]); // a tag already registered
+            return;
         } catch (RuntimeException $e) {
             $this->serverError();
             return;
@@ -272,24 +287,17 @@ class ProductController
         ]);
     }
 
-    public function pointsCalculate(float $price): int
-    {
-        //for every dollar they get 10 points out of it
-
-        return (int)$price * 10;
-    }
-
-    /** GET /api/products/lookup?code=...: the product behind a scanned UPC or EPC. */
+    /** GET /api/products/lookup?code=...: the product type behind a scanned barcode. */
     public function lookup(): void
     {
         $code = trim((string) ($_GET['code'] ?? ''));
         if ($code === '') {
-            jsonResponse(422, ['status' => 'error', 'message' => 'Add ?code= with a UPC or an EPC.']);
+            jsonResponse(422, ['status' => 'error', 'message' => 'Add ?code= with a UPC.']);
             return;
         }
 
         try {
-            $product = $this->products->findByCode($code, ($_GET['type'] ?? '') === 'epc');
+            $product = $this->products->findByCode($code);
         } catch (RuntimeException $e) {
             $this->serverError();
             return;
@@ -301,6 +309,25 @@ class ProductController
         }
 
         jsonResponse(200, ['status' => 'success', 'product' => $product]);
+    }
+
+    /**
+     * GET /api/items/lookup?epcs=E280...,E280...: every tag the reader saw at once,
+     * each with its status (in_stock, sold or unknown) and product. Used by checkout and receiving.
+     */
+    public function itemLookup(): void
+    {
+        [$epcs, $errors] = (new ScanModel())->validate(explode(',', (string) ($_GET['epcs'] ?? '')));
+        if ($errors !== []) {
+            jsonResponse(422, ['status' => 'error', 'message' => 'Add ?epcs= with up to 100 EPCs separated by commas.']);
+            return;
+        }
+
+        try {
+            jsonResponse(200, ['status' => 'success', 'items' => $this->items->lookup($epcs)]);
+        } catch (RuntimeException $e) {
+            $this->serverError();
+        }
     }
 
     /** Pages: send guests to the login page and refuse non-admins. */
@@ -359,6 +386,19 @@ class ProductController
         return $product;
     }
 
+    /** The product form, with the category list for its dropdown. */
+    private function renderForm(?array $product): void
+    {
+        try {
+            $categories = $this->products->categories();
+        } catch (RuntimeException $e) {
+            $this->pageError(500, 'Could not load the categories. Please try again.');
+            return;
+        }
+
+        $this->render('products/form', ['product' => $product, 'categories' => $categories]);
+    }
+
     /** A positive integer from $_GET/$_POST, or null. */
     private function id(array $source, string $key = 'id'): ?int
     {
@@ -403,15 +443,6 @@ class ProductController
             'message' => 'Please fix the highlighted fields and try again.',
             'errors' => $errors,
         ]);
-    }
-
-    public function getProductByBarcode(string $barcode): ?array
-    {
-        try {
-            return $this->products->findByCode($barcode);
-        } catch (RuntimeException $e) {
-            return null;
-        }
     }
 
     private function serverError(): void

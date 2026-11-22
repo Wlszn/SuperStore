@@ -131,8 +131,6 @@
     async function updateReceptionSummary() {
         receptionRequest?.abort();
         const option = productSelect.selectedOptions[0];
-        const code = option?.dataset.upc || option?.dataset.epc;
-        document.getElementById('receiving-checkout').href = code ? '/checkout?code=' + encodeURIComponent(code) : '/checkout';
         receptionSummary.hidden = !option?.value;
         if (receptionSummary.hidden) return;
 
@@ -156,21 +154,6 @@
             }
         }
     }
-
-    const demoDelivery = document.getElementById('demo-delivery');
-    demoDelivery?.addEventListener('click', () => {
-        if (!productSelect.value) {
-            productSelect.reportValidity();
-            productSelect.focus();
-            return;
-        }
-        const quantity = productSelect.form.elements.namedItem('quantity');
-        const date = productSelect.form.elements.namedItem('received_at');
-        quantity.value = '12';
-        date.value = date.max;
-        displayNotice(notice, 'Sample delivery filled in.', false);
-        quantity.focus();
-    });
 
     if (productSelect) {
         productSelect.addEventListener('change', () => {
@@ -211,8 +194,7 @@
                 if (match) {
                     productSelect.value = match.value;
                     updateReceptionSummary();
-                    showScanStatus('Product selected.');
-                    productSelect.form.elements.namedItem('quantity').focus();
+                    showScanStatus('Product selected. Put the new items on the reader.');
                     return;
                 }
             } else {
@@ -234,81 +216,83 @@
         });
     }
 
-    const capture = document.getElementById('capture-epc');
-    const epcInput = document.getElementById('product-epc');
-    const epcStatus = document.getElementById('epc-status');
-    let captureSession;
+    // Receive stock: every NEW tag the reader sees becomes one item of the chosen product.
+    // Tags that already belong to an item are listed but not sent.
+    const tagList = document.getElementById('received-tags');
+    if (tagList) {
+        const newTags = [];
+        const listed = new Set();
+        const hiddenEpcs = document.getElementById('reception-epcs');
+        const receiveButton = document.getElementById('receive-submit');
+        const reader = document.getElementById('reader');
+        const readerStatus = document.getElementById('reader-status');
+        const readerLight = document.getElementById('reader-light');
+        let stopFeed;
 
-    function setEpc(epc) {
-        epcInput.value = epc;
-        if (document.activeElement === epcInput) epcInput.select();
-        window.showNotification('EPC captured. Save the product to assign it.');
-    }
-
-    epcInput?.addEventListener('keydown', event => {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        const epc = epcInput.value.trim().toUpperCase();
-        if (!/^[0-9A-F]{1,24}$/.test(epc)) {
-            window.showNotification('The EPC must be up to 24 hexadecimal characters (0-9, A-F).', true);
-            epcInput.select();
-            return;
+        function renderTags() {
+            hiddenEpcs.replaceChildren(...newTags.map(epc => Object.assign(document.createElement('input'),
+                { type: 'hidden', name: 'epcs[]', value: epc })));
+            document.getElementById('no-tags').hidden = listed.size > 0;
+            window.setLocalizedText(receiveButton, newTags.length === 1
+                ? 'Receive 1 item' : 'Receive {0} items'.replace('{0}', newTags.length));
         }
-        if (captureSession) {
-            captureSession.abort();
-            setEpc(epc);
-        } else {
-            epcInput.value = epc;
-            epcInput.select();
-        }
-    });
 
-    capture?.addEventListener('click', async () => {
-        if (captureSession) return;
-        const session = new AbortController();
-        captureSession = session;
-        capture.disabled = true;
-        epcInput.focus();
-        epcInput.select();
-        window.setLocalizedText(epcStatus, 'Connecting to the RFID scan feed...');
-        let expired = false;
-        const timeout = setTimeout(() => {
-            expired = true;
-            session.abort();
-        }, 20000);
-        const options = { signal: session.signal, cache: 'no-store' };
-
-        try {
-            const initial = await fetch('/api/scans/latest?arm=1', options);
-            if (!initial.ok) throw new Error('Reader feed unavailable.');
-            let cursor = (await initial.json()).last_id;
-            if (session.signal.aborted) return;
-            window.setLocalizedText(epcStatus, 'Place one tag on the reader. Waiting up to 20 seconds.');
-
-            while (!session.signal.aborted) {
-                const response = await fetch('/api/scans/latest?after=' + cursor, options);
-                if (!response.ok) throw new Error('Reader feed unavailable.');
-                const result = await response.json();
-                if (session.signal.aborted) return;
-                cursor = result.last_id;
-                const epcs = [...new Set(result.scans.map(scan => scan.epc.trim().toUpperCase()))];
-                if (epcs.length > 1) throw new Error('Multiple tags detected. Leave only one tag and try again.');
-                if (epcs.length === 1) {
-                    setEpc(epcs[0]);
-                    return;
+        function addTags(items) {
+            let added = 0;
+            for (const item of items) {
+                if (listed.has(item.epc)) continue;
+                listed.add(item.epc);
+                const row = document.createElement('li');
+                const code = Object.assign(document.createElement('span'), { className: 'code', textContent: item.epc });
+                row.append(code);
+                if (item.status === 'unknown') {
+                    newTags.push(item.epc);
+                    added++;
+                    const remove = Object.assign(document.createElement('button'), { type: 'button', className: 'button' });
+                    window.setLocalizedText(remove, 'Remove');
+                    remove.onclick = () => {
+                        newTags.splice(newTags.indexOf(item.epc), 1);
+                        row.remove();
+                        listed.delete(item.epc);
+                        renderTags();
+                    };
+                    row.append(remove);
+                } else {
+                    const taken = Object.assign(document.createElement('span'), { className: 'tag-taken' });
+                    window.setLocalizedText(taken, 'Already registered: {0}'.replace('{0}', item.product.name));
+                    row.append(taken);
                 }
-                await new Promise(resolve => setTimeout(resolve, 500));
+                tagList.append(row);
             }
-        } catch (error) {
-            if (!session.signal.aborted) {
-                window.showNotification(error instanceof TypeError ? 'Reader feed unavailable.' : error.message, true);
+            renderTags();
+            if (added) {
+                window.showNotification((added === 1 ? '{0} new tag read.' : '{0} new tags read.').replace('{0}', added));
             }
-        } finally {
-            clearTimeout(timeout);
-            captureSession = undefined;
-            capture.disabled = false;
-            window.setLocalizedText(epcStatus, '');
-            if (expired) window.showNotification('No tag received. Check that the RFID bridge is running and try again.', true);
         }
-    });
+
+        function setReaderStatus(text, isError) {
+            window.setLocalizedText(readerStatus, text);
+            readerStatus.classList.toggle('error', isError);
+            readerLight.classList.toggle('on', Boolean(stopFeed) && !isError);
+        }
+
+        function startReader() {
+            stopFeed = window.startRfidFeed(addTags, setReaderStatus);
+            window.setLocalizedText(reader, 'Stop reader');
+        }
+
+        reader.addEventListener('click', () => {
+            if (!stopFeed) {
+                startReader();
+                return;
+            }
+            stopFeed();
+            stopFeed = undefined;
+            window.setLocalizedText(reader, 'Start reader');
+            setReaderStatus('Reader stopped.', false);
+        });
+        window.addEventListener('pagehide', () => stopFeed?.());
+        renderTags();
+        startReader();
+    }
 })();
