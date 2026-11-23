@@ -119,6 +119,10 @@ h2 { margin-bottom: 14px; font-size: 15px; font-weight: 650; }
 .stats dd { margin: 5px 0 0; font-size: 23px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .stats.details { grid-template-columns: .75fr .8fr 1.2fr 1.65fr; }
 .stats dd.code { font-size: 13px; overflow-wrap: anywhere; padding-top: 5px; }
+.stats.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stats dd.period { font-size: 16px; padding-top: 6px; }
+.report-filters { margin-bottom: 20px; }
+.report-filters label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 
 .panel { border: 1px solid var(--line); border-radius: 8px; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; }
@@ -212,6 +216,9 @@ dialog .notice { margin: 14px 0 0; }
     .stats.details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats.details > div:nth-child(3) { border-left: 0; }
     .stats.details > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .stats.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stats.four > div:nth-child(3) { border-left: 0; }
+    .stats.four > div:nth-child(n+3) { border-top: 1px solid var(--line); }
     .fields { grid-template-columns: 1fr; }
     .toolbar .search { width: 100%; }
 }
