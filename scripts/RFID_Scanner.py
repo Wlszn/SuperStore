@@ -1,6 +1,10 @@
-
+import argparse
+import sys
 import time
+
 import serial
+
+from rfid import publish
 
 PORT = "/dev/ttyUSB0"  # Change to /dev/ttyACM0 if needed
 BAUD = 115200  # CF600 serial baud rate
@@ -41,27 +45,42 @@ def parse_epcs(buf):
             epc_len = data[5]
             epc = data[6:6 + epc_len]
 
-            if len(epc) == epc_len:
+            if 1 <= epc_len <= 12 and len(epc) == epc_len:
                 epcs.append(epc.hex().upper())
 
         i = end
 
 
-# Open serial connection
-ser = serial.Serial(PORT, BAUD, timeout=0.5)
+def main():
+    parser = argparse.ArgumentParser(description="CF600 serial bridge for SuperStore")
+    parser.add_argument("--port", default=PORT, help="Reader port, for example /dev/ttyUSB0 or COM3")
+    parser.add_argument("--url", default="http://127.0.0.1:8000", help="SuperStore base URL")
+    args = parser.parse_args()
 
-print(f"Opened {PORT} at {BAUD}. Hold a tag near the reader...")
+    with serial.Serial(args.port, BAUD, timeout=0.5) as reader:
+        print(f"Reader connected to {args.port}. Sending scans to {args.url}.", flush=True)
+        buffer = b""
+        while True:
+            reader.write(READ_TAGS)
+            time.sleep(0.5)
+            buffer += reader.read(reader.in_waiting)
+            epcs, buffer = parse_epcs(buffer)
+            tags = list(dict.fromkeys(epcs))
+            for offset in range(0, len(tags), 100):
+                batch = tags[offset:offset + 100]
+                try:
+                    publish(args.url, batch)
+                    print(f"Sent {len(batch)} tag(s) to SuperStore.", flush=True)
+                except (OSError, ValueError, RuntimeError) as error:
+                    print(f"Could not send scans to {args.url}: {error}", file=sys.stderr, flush=True)
+                    time.sleep(1)
 
-buf = b""
 
-while True:
-    ser.write(READ_TAGS)
-    time.sleep(0.5)
-
-    buf += ser.read(ser.in_waiting)
-
-    epcs, buf = parse_epcs(buf)
-
-    # Remove duplicate EPCs from the current read
-    for epc in dict.fromkeys(epcs):
-        print(epc)
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Reader stopped.")
+    except OSError as error:
+        print(f"Could not open or read the RFID reader: {error}", file=sys.stderr)
+        sys.exit(1)

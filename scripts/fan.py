@@ -39,7 +39,7 @@ def set_fan(on):
 def read_fan_state():
     """True or False as stored by the website, or None if it can't be reached."""
     try:
-        with urllib.request.urlopen(API_URL, timeout=3) as response:
+        with urllib.request.urlopen(API_URL, timeout=10) as response:
             return bool(json.load(response)["fan"]["is_on"])
     except (OSError, ValueError, KeyError):
         return None

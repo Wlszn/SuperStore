@@ -205,7 +205,7 @@ class CustomerModel
 
     public function create(): bool
     {
-        $created = supa_insert_customer([
+        $data = [
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
@@ -213,9 +213,13 @@ class CustomerModel
             'created_at' => $this->createdAt,
             'password_hash' => $this->passwordHash,
             'is_admin' => $this->isAdmin,
-            'membership_number' => $this->membershipNumber,
             'points' => $this->points,
-        ]);
+        ];
+
+        if ($this->membershipNumber !== '') {
+            $data['membership_number'] = $this->membershipNumber;
+        }
+        $created = supa_insert_customer($data);
 
         if ($created === null) {
             error_log('Failed to create customer.');
@@ -271,8 +275,8 @@ class CustomerModel
             (int) $data['id'],
             $data['name'],
             $data['email'],
-            $data['phone'],
-            $data['address'],
+            $data['phone'] ?? '',
+            $data['address'] ?? '',
             $data['created_at'],
             $data['password_hash'] ?? '',
             (bool) ($data['is_admin'] ?? false),

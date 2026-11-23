@@ -1,7 +1,7 @@
 <?php
 
 if (isset($_SESSION['customer_id'])) {
-    header('Location: /dashboard');
+    header('Location: ' . (empty($_SESSION['is_admin']) ? '/account' : '/products'));
     exit;
 }
 ?>
@@ -12,24 +12,26 @@ if (isset($_SESSION['customer_id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>SuperStore - Sign in</title>
+    <title data-i18n>SuperStore - Sign in</title>
 
     <link rel="stylesheet" href="assets/css/style.css">
+<script src="/assets/js/language.js" defer></script>
 </head>
 
-<body>
+<body class="auth-page">
 
 <div class="container">
+    <div class="language-control"><button type="button" id="language-switch" aria-label="Passer au fran&#231;ais">FR</button></div>
 
     <h1>SuperStore</h1>
-    <p class="subtitle">Sign in to your account</p>
+    <p class="subtitle"><span data-i18n>Sign in to your account</span></p>
 
     <div id="message" class="form-message" hidden></div>
 
     <form id="loginForm" novalidate>
 
         <div class="field">
-            <label for="email">Email address</label>
+            <label for="email"><span data-i18n>Email address</span></label>
             <input
                 type="email"
                 id="email"
@@ -42,7 +44,7 @@ if (isset($_SESSION['customer_id'])) {
         </div>
 
         <div class="field">
-            <label for="password">Password</label>
+            <label for="password"><span data-i18n>Password</span></label>
             <input
                 type="password"
                 id="password"
@@ -55,16 +57,16 @@ if (isset($_SESSION['customer_id'])) {
 
         <label class="show-password" for="showPassword">
             <input type="checkbox" id="showPassword">
-            Show password
+            <span data-i18n>Show password</span>
         </label>
 
-        <button type="submit" id="submitBtn">Sign in</button>
+        <button type="submit" id="submitBtn"><span data-i18n>Sign in</span></button>
 
     </form>
 
     <p class="switch-page">
         New to SuperStore?
-        <a href="/signup">Create an account</a>
+        <a href="/signup"><span data-i18n>Create an account</span></a>
     </p>
 
 </div>
@@ -104,14 +106,14 @@ if (isset($_SESSION['customer_id'])) {
         clearFormErrors(form);
 
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Signing in...';
+        window.setLocalizedText(submitBtn, 'Signing in...');
 
         try {
             const data = await postForm('login', form);
 
             if (data.status === 'success') {
                 showMessage(message, data.message, true);
-                window.location.href = data.redirect || '/dashboard';
+                window.location.href = data.redirect || '/';
             } else {
                 showFormErrors(form, data.errors || {});
                 showMessage(message, data.message, false);
@@ -120,7 +122,7 @@ if (isset($_SESSION['customer_id'])) {
             showMessage(message, 'Could not reach the server. Please check your connection and try again.', false);
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Sign in';
+            window.setLocalizedText(submitBtn, 'Sign in');
         }
     });
 </script>

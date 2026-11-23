@@ -52,13 +52,13 @@ class ScanModel
     }
 
     /** The most recent scan, or null if nothing has been scanned yet. */
-    public function latest(): ?array
+    public function latest(?string $before = null): ?array
     {
         $rows = SupaClient::rows('GET', self::TABLE, [
             'select' => self::COLUMNS,
             'order' => 'id.desc',
             'limit' => 1,
-        ]);
+        ] + ($before === null ? [] : ['scanned_at' => 'lt.' . $before]));
 
         return $rows ? $this->normalize($rows[0]) : null;
     }

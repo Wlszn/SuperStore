@@ -5,11 +5,15 @@ namespace App\Models;
 
 use App\Services\SupaClient;
 
+/**
+ * A product TYPE, identified by its barcode (e.g. "KitKat 4 Finger 45g", producer Nestle).
+ * The physical items of a type, one per RFID tag, are in ItemModel; stock = items not sold yet.
+ */
 class ProductModel
 {
     private const TABLE = 'products';
     private const STOCK_VIEW = 'product_stock';
-    private const COLUMNS = 'id,name,category,price,upc,epc,producer,image_url,in_stock';
+    private const COLUMNS = 'id,name,category,price,upc,producer,image_url,in_stock';
 
     private const MAX_PRICE = 99999999.99; // NUMERIC(10,2)
 
@@ -39,28 +43,37 @@ class ProductModel
         return $rows ? $this->normalize($rows[0]) : null;
     }
 
-    /** The product whose UPC (barcode) or EPC (RFID tag) matches a scan, or null. */
+    /** The categories the product form offers, in alphabetical order. */
+    public function categories(): array
+    {
+        $rows = SupaClient::rows('GET', 'categories', ['select' => 'name', 'order' => 'name.asc']);
+
+        return array_column($rows, 'name');
+    }
+
+    /** The product type whose barcode (UPC) matches a scan, or null. */
     public function findByCode(string $code): ?array
     {
-        $code = strtoupper(str_replace(' ', '', trim($code)));
-
-        // Codes are only digits/hex letters; anything else can't match and
-        // would break the `or=(...)` filter syntax.
-        if ($code === '' || !ctype_alnum($code)) {
+        $code = trim($code);
+        if ($code === '' || strlen($code) > 13 || preg_match('/[\x00-\x1F\x7F]/', $code)) {
             return null;
         }
-
-        // A 12-digit UPC-A is stored as its 13-digit EAN form (see normalizeUpc).
-        if (ctype_digit($code)) {
-            $code = self::normalizeUpc($code);
-        }
-
         $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
-            'select' => self::COLUMNS,
-            'or' => sprintf('(upc.eq.%1$s,epc.eq.%1$s)', $code),
-            'limit' => 1,
+            'select' => self::COLUMNS, 'upc' => 'eq.' . $code, 'limit' => 1,
         ]);
-
+        if (!$rows && ctype_digit($code)) {
+            $alternateUpc = strlen($code) === 12 ? self::normalizeUpc($code) : '';
+            if (strlen($code) === 13 && str_starts_with($code, '0')) {
+                $alternateUpc = substr($code, 1);
+            }
+            if ($alternateUpc !== '') {
+                $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
+                    'select' => self::COLUMNS,
+                    'upc' => 'eq.' . $alternateUpc,
+                    'limit' => 1,
+                ]);
+            }
+        }
         return $rows ? $this->normalize($rows[0]) : null;
     }
 
@@ -70,7 +83,7 @@ class ProductModel
     {
         $rows = SupaClient::rows('POST', self::TABLE, null, $data);
 
-        // A new product has no receptions yet.
+        // A new product type has no items yet.
         return $this->normalize($rows[0] + ['in_stock' => 0]);
     }
 
@@ -82,15 +95,10 @@ class ProductModel
         return $rows !== [];
     }
 
-    /** Delete a product (its receptions go with it, ON DELETE CASCADE). */
+    /** Delete a product type (its receptions and items go with it, ON DELETE CASCADE). */
     public function delete(int $id): void
     {
         SupaClient::rows('DELETE', self::TABLE, ['id' => 'eq.' . $id]);
-    }
-
-    public function pointsCalculate(float $price): int 
-    {
-        return (int)$price * 10;
     }
 
     public function validate(array $input, ?int $id = null): array
@@ -105,10 +113,8 @@ class ProductModel
         }
 
         $category = trim((string) ($input['category'] ?? ''));
-        if ($category === '') {
-            $errors['category'] = 'Please enter a category, for example Beverage.';
-        } elseif (mb_strlen($category) > 50) {
-            $errors['category'] = 'Category cannot be longer than 50 characters.';
+        if (!in_array($category, $this->categories(), true)) {
+            $errors['category'] = 'Please choose a category from the list.';
         }
 
         // Accept "2,49" as well as "2.49" (decimal comma).
@@ -119,23 +125,16 @@ class ProductModel
             $errors['price'] = 'The price must be a positive number, for example 2.49.';
         }
 
-        // Scanners and readers may add spaces; EPCs are hex, so compare in uppercase.
-        $upc = str_replace(' ', '', trim((string) ($input['upc'] ?? '')));
-        $epc = strtoupper(str_replace(' ', '', trim((string) ($input['epc'] ?? ''))));
+        // The barcode identifies the type: scanning it selects this product when receiving stock.
+        $upc = trim((string) ($input['upc'] ?? ''));
 
-        if ($upc === '' && $epc === '') {
-            $errors['upc'] = 'Enter a UPC or an EPC so the product can be scanned.';
-        }
-        if ($upc !== '' && !preg_match('/^\d{8,13}$/', $upc)) {
-            $errors['upc'] = 'The UPC must be 8 to 13 digits.';
-        } elseif ($upc !== '') {
-            $upc = self::normalizeUpc($upc);
-            if (strlen($upc) === 13 && !self::hasValidCheckDigit($upc)) {
-                $errors['upc'] = 'This barcode is not valid (wrong last digit). Scan it again or check for a typo.';
-            }
-        }
-        if ($epc !== '' && !preg_match('/^[0-9A-F]{1,24}$/', $epc)) {
-            $errors['epc'] = 'The EPC must be up to 24 hexadecimal characters (0-9, A-F).';
+        if ($upc === '') {
+            $errors['upc'] = 'Scan or enter the barcode of this product.';
+        } elseif (mb_strlen($upc) > 13 || preg_match('/[\x00-\x1F\x7F]/', $upc)) {
+            $errors['upc'] = 'The barcode must contain 1 to 13 printable characters.';
+        } elseif (preg_match('/^\d{12,13}$/', $upc) && !self::hasValidCheckDigit(self::normalizeUpc($upc))) {
+            // A real UPC/EAN ends with a check digit, so a typo or bad scan is caught here.
+            $errors['upc'] = 'This barcode is not valid (wrong last digit). Scan it again or check for a typo.';
         }
 
         $producer = trim((string) ($input['producer'] ?? ''));
@@ -152,19 +151,15 @@ class ProductModel
         }
 
         // Only ask the database about duplicates once the format is right.
-        if ($upc !== '' && !isset($errors['upc']) && $this->isTaken('upc', $upc, $id)) {
+        if (!isset($errors['upc']) && $this->isTaken('upc', $upc, $id)) {
             $errors['upc'] = 'Another product already uses this UPC.';
-        }
-        if ($epc !== '' && !isset($errors['epc']) && $this->isTaken('epc', $epc, $id)) {
-            $errors['epc'] = 'Another product already uses this EPC.';
         }
 
         $data = [
             'name' => $name,
             'category' => $category,
             'price' => round((float) $rawPrice, 2),
-            'upc' => $upc === '' ? null : $upc,
-            'epc' => $epc === '' ? null : $epc,
+            'upc' => $upc,
             'producer' => $producer,
             'image_url' => $imageUrl === '' ? null : $imageUrl,
         ];
@@ -172,7 +167,7 @@ class ProductModel
         return [$data, $errors];
     }
 
-    /** True if another product (not $exceptId) already has this UPC/EPC. */
+    /** True if another product (not $exceptId) already has this UPC. */
     private function isTaken(string $column, string $value, ?int $exceptId): bool
     {
         $query = [
@@ -192,7 +187,7 @@ class ProductModel
         return strlen($upc) === 12 ? '0' . $upc : $upc;
     }
 
-    /** EAN-13 check digit: weights 1,3,1,3... on the first 12 digits. */
+    /** EAN-13 check digit*/
     private static function hasValidCheckDigit(string $ean13): bool
     {
         $sum = 0;

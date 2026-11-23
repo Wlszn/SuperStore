@@ -1,7 +1,7 @@
 <?php
 
 if (isset($_SESSION['customer_id'])) {
-    header('Location: /dashboard');
+    header('Location: ' . (empty($_SESSION['is_admin']) ? '/account' : '/products'));
     exit;
 }
 ?>
@@ -12,24 +12,26 @@ if (isset($_SESSION['customer_id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>SuperStore - Create account</title>
+    <title data-i18n>SuperStore - Create account</title>
 
     <link rel="stylesheet" href="assets/css/style.css">
+<script src="/assets/js/language.js" defer></script>
 </head>
 
-<body>
+<body class="auth-page">
 
 <div class="container">
+    <div class="language-control"><button type="button" id="language-switch" aria-label="Passer au fran&#231;ais">FR</button></div>
 
-    <h1>Create your account</h1>
-    <p class="subtitle">It only takes a minute</p>
+    <h1><span data-i18n>Create your account</span></h1>
+    <p class="subtitle"><span data-i18n>It only takes a minute</span></p>
 
     <div id="message" class="form-message" hidden></div>
 
     <form id="signupForm" novalidate>
 
         <div class="field">
-            <label for="name">Full name</label>
+            <label for="name"><span data-i18n>Full name</span></label>
             <input
                 type="text"
                 id="name"
@@ -42,7 +44,7 @@ if (isset($_SESSION['customer_id'])) {
         </div>
 
         <div class="field">
-            <label for="email">Email address</label>
+            <label for="email"><span data-i18n>Email address</span></label>
             <input
                 type="email"
                 id="email"
@@ -55,12 +57,12 @@ if (isset($_SESSION['customer_id'])) {
         </div>
 
         <div class="field">
-            <label for="phone">Phone number</label>
+            <label for="phone"><span data-i18n>Phone number</span></label>
             <input
                 type="tel"
                 id="phone"
                 name="phone"
-                maxlength="15"
+                inputmode="numeric"
                 autocomplete="tel"
                 required
             >
@@ -68,7 +70,7 @@ if (isset($_SESSION['customer_id'])) {
         </div>
 
         <div class="field">
-            <label for="address">Address</label>
+            <label for="address"><span data-i18n>Address</span></label>
             <input
                 type="text"
                 id="address"
@@ -81,7 +83,7 @@ if (isset($_SESSION['customer_id'])) {
         </div>
 
         <div class="field">
-            <label for="password">Password</label>
+            <label for="password"><span data-i18n>Password</span></label>
             <input
                 type="password"
                 id="password"
@@ -89,12 +91,12 @@ if (isset($_SESSION['customer_id'])) {
                 autocomplete="new-password"
                 required
             >
-            <p class="field-hint">At least 8 characters, with at least one letter and one number.</p>
+            <p class="field-hint"><span data-i18n>At least 8 characters, with at least one letter and one number.</span></p>
             <p class="field-error" id="error-password"></p>
         </div>
 
         <div class="field">
-            <label for="confirm_password">Confirm password</label>
+            <label for="confirm_password"><span data-i18n>Confirm password</span></label>
             <input
                 type="password"
                 id="confirm_password"
@@ -107,16 +109,16 @@ if (isset($_SESSION['customer_id'])) {
 
         <label class="show-password" for="showPassword">
             <input type="checkbox" id="showPassword">
-            Show passwords
+            <span data-i18n>Show passwords</span>
         </label>
 
-        <button type="submit" id="submitBtn">Create account</button>
+        <button type="submit" id="submitBtn"><span data-i18n>Create account</span></button>
 
     </form>
 
     <p class="switch-page">
-        Already have an account?
-        <a href="/login">Sign in</a>
+        <span data-i18n>Already have an account?</span>
+        <a href="/login"><span data-i18n>Sign in</span></a>
     </p>
 
 </div>
@@ -128,6 +130,7 @@ if (isset($_SESSION['customer_id'])) {
     const submitBtn = document.getElementById('submitBtn');
 
     wireShowPasswordToggle('showPassword', ['password', 'confirm_password']);
+    wirePhoneNumberInput(form.elements.phone);
 
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
@@ -148,14 +151,14 @@ if (isset($_SESSION['customer_id'])) {
         clearFormErrors(form);
 
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Creating your account...';
+        window.setLocalizedText(submitBtn, 'Creating your account...');
 
         try {
             const data = await postForm('register', form);
 
             if (data.status === 'success') {
                 showMessage(message, data.message, true);
-                window.location.href = data.redirect || '/dashboard';
+                window.location.href = data.redirect || '/';
             } else {
                 showFormErrors(form, data.errors || {});
                 showMessage(message, data.message, false);
@@ -164,7 +167,7 @@ if (isset($_SESSION['customer_id'])) {
             showMessage(message, 'Could not reach the server. Please check your connection and try again.', false);
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Create account';
+            window.setLocalizedText(submitBtn, 'Create account');
         }
     });
 </script>

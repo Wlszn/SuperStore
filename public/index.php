@@ -7,16 +7,19 @@ session_start();
 date_default_timezone_set('America/Toronto');
 
 use App\Controllers\AuthController;
-use App\Controllers\BarcodeController;
-use App\Controllers\CustomerController;
 use App\Controllers\ThresholdController;
 use App\Controllers\ReadingApiController;
 use App\Controllers\FanApiController;
 use App\Controllers\ProductController;
 use App\Controllers\ScanApiController;
+use App\Controllers\SalesReportController;
 
 
 define('APP_ROOT', dirname(__DIR__));
+
+// Delivery and order tracking is only stored in the browser tab for now (nothing is
+// saved on the server), so it is switched off. Set to true to show it again.
+const ORDER_TRACKING = false;
 
 spl_autoload_register(function (string $class): void {
     $prefix = 'App\\';
@@ -26,7 +29,7 @@ spl_autoload_register(function (string $class): void {
 
     $parts = explode('\\', substr($class, strlen($prefix)));
     $file = array_pop($parts);
-    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : ''; 
+    $dir = $parts ? strtolower(implode('/', $parts)) . '/' : '';
 
     $path = APP_ROOT . '/app/' . $dir . $file . '.php';
     if (is_file($path)) {
@@ -49,18 +52,24 @@ function view(string $name): void
 }
 
 $routes = [
-    'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? '/dashboard' : '/login')),
+    'POST /account/membership' => [App\Controllers\CheckoutController::class, 'membership'],
+    'GET /order-confirmation' => fn() => ORDER_TRACKING ? view('order-confirmation') : header('Location: /account'),
+    'GET /checkout' => [App\Controllers\CheckoutController::class, 'index'],
+    'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
+    'GET /api/members/lookup' => [App\Controllers\CheckoutController::class, 'memberLookup'],
+    'GET /account' => [App\Controllers\CheckoutController::class, 'account'],
+    'GET /receipt' => [App\Controllers\CheckoutController::class, 'receipt'],
+    'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? (empty($_SESSION['is_admin']) ? '/account' : '/products') : '/login')),
 
     'GET /login' => fn() => view('login'),
     'GET /signup' => fn() => view('signup'),
-    'GET /dashboard' => fn() => view('dashboard'),
+    'GET /dashboard' => [ThresholdController::class, 'index'],
 
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],
     'GET /logout' => [AuthController::class, 'logout'],
-    'POST /api/customer/points' => [CustomerController::class, 'pointsEarned'],
 
-    'GET /thresholds' => [ThresholdController::class, 'index'],
+    'GET /thresholds' => fn() => header('Location: /dashboard'), // thresholds are edited on the dashboard
     'POST /thresholds' => [ThresholdController::class, 'update'],
     'GET /api/thresholds' => [ThresholdController::class, 'json'],
 
@@ -79,12 +88,19 @@ $routes = [
     'POST /products'         => [ProductController::class, 'store'],
     'POST /products/update'  => [ProductController::class, 'update'],
     'POST /products/delete'  => [ProductController::class, 'delete'],
+    'GET /api/receptions/latest' => [ProductController::class, 'latestReception'],
     'POST /receptions'       => [ProductController::class, 'receive'],
 
     // Phase 3: scanners (used by management and self-checkout)
     'GET /api/products/lookup' => [ProductController::class, 'lookup'],
-    'POST /api/scans'          => [BarcodeController::class, 'processBarcode'],
+    'GET /api/items/lookup'    => [ProductController::class, 'itemLookup'],
+    'POST /api/scans'          => [ScanApiController::class, 'store'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
+
+    // Phase 4: reports (admin only)
+    'GET /api/reports/sales' => [SalesReportController::class, 'sales'],
+    'GET /reports/sales' => [App\Controllers\SalesReportController::class, 'page'],
+
 ];
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';

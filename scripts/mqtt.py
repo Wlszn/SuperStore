@@ -58,5 +58,5 @@ void loop() {
     }
 
     mqtt.loop();
-    delay(5000);
+    delay(2000);   // one reading every 2 s keeps the dashboard live (the DHT11 allows 1 per second)
 }
