@@ -35,6 +35,9 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
                 <a href="/dashboard" class="nav-link <?= $section === 'fridges' ? 'current' : '' ?>" <?= $section === 'fridges' ? 'aria-current="page"' : '' ?>>
                     <span class="nav-icon" aria-hidden="true">❄</span> <span data-i18n>Fridge dashboard</span>
                 </a>
+                <a href="/reports/sales" class="nav-link <?= $section === 'sales' ? 'current' : '' ?>" <?= $section === 'sales' ? 'aria-current="page"' : '' ?>>
+                    <span class="nav-icon" aria-hidden="true">$</span> <span data-i18n>Sales report</span>
+                </a>
             <?php endif; ?>
         </nav>
         <?php if (isset($_SESSION['customer_id'])): ?>
@@ -50,6 +53,8 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
                 <a href="/dashboard"><span data-i18n>Monitoring</span></a>
             <?php elseif ($section === 'products' || $section === 'receive'): ?>
                 <a href="/products"><span data-i18n>Inventory</span></a>
+            <?php elseif ($section === 'sales'): ?>
+                <a href="/reports/sales"><span data-i18n>Reports</span></a>
             <?php else: ?>
                 <a href="/"><span data-i18n>Store</span></a>
             <?php endif; ?><span aria-hidden="true">/</span><span <?= $section !== 'products' || !isset($product) || $title !== $product['name'] ? 'data-i18n' : '' ?>><?= $e($title) ?></span>

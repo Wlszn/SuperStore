@@ -55,4 +55,48 @@ class SalesReportController
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
         return $date && $date->format('Y-m-d') === $value ? $date : null;
     }
+
+    //GET /reports/sales: the Sales Report page (admin only)
+    public function page(): void{
+        if(!isset($_SESSION['customer_id'])){
+            header('Location: /login');
+            return;
+        }
+        if(empty($_SESSION['is_admin'])){
+            http_response_code(403);
+            echo 'Only store administrators can see reports. <a href="/">Back</a>';
+            return;
+        }
+
+        //Defaults: the last 7 days, all categories.
+        $today = (new DateTimeImmutable('today')) -> format('Y-m-d');
+        $filters = [
+            'mode' => ($_GET['mode'] ?? 'range') === 'day' ? 'day' : 'range',
+            'day' => (string) ($_GET['day'] ?? $today),
+            'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-6 days')) -> format('Y-m-d')),
+            'to' => (string) ($_GET['to'] ?? $today),
+            'category' => trim((string) ($_GET['category'] ?? '')),
+        ];
+
+        //A single day is just a range where from = to.
+        $from = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
+        $to = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
+        $report = null;
+        $error = null;
+        $categories = [];
+        try{
+            $categories = (new ProductModel()) -> categories();
+            if($from === null || $to === null || $from > $to) {
+                $error = 'Choose a valid date range (\'from\' must be before \'to\').';
+            } elseif($filters['category'] !== '' && !in_array($filters['category'], $categories, true)){
+                $error = 'Unknown category.';
+            } else {
+                $report = (new SalesReportModel()) -> sales($from, $to, $filters['category'] ?: null);
+            }
+        } catch(RuntimeException $e){
+            $error = 'Could not load the sales report. Please try again.';
+        }
+
+        require APP_ROOT . '/app/views/reports/sales.php';
+    }
 }
