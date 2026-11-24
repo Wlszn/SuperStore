@@ -49,3 +49,59 @@ $$;
 -- Only the server (service key) may call it, like the other functions.
 REVOKE ALL ON FUNCTION sales_report(date, date, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sales_report(date, date, text) TO service_role;
+
+-- Most and least sold products for a date range (spec 2.2, P4-11).
+-- Ties at the cut-off are all kept (RANK). Products with no sales count as 0,
+-- so they can be least sold. Deleted products that sold keep their old name.
+CREATE OR REPLACE FUNCTION sales_ranking(p_from date, p_to date, p_limit integer, p_category text DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE sql STABLE
+SET search_path = public
+AS $$
+  WITH sold AS (
+    -- Quantity sold per product in the period (Montreal days, p_to included).
+    SELECT pi.product_id, pi.name, SUM(pi.quantity)::int AS qty
+    FROM purchase_items pi
+    JOIN purchases pu ON pu.id = pi.purchase_id
+    WHERE pu.purchased_at >= (p_from::timestamp     AT TIME ZONE 'America/Toronto')
+      AND pu.purchased_at <  ((p_to + 1)::timestamp AT TIME ZONE 'America/Toronto')
+    GROUP BY pi.product_id, pi.name
+  ),
+  candidates AS (
+    -- Every current product, with 0 when it did not sell.
+    SELECT p.id AS product_id, p.name, p.category, false AS deleted,
+           COALESCE((SELECT SUM(s.qty) FROM sold s WHERE s.product_id = p.id), 0)::int AS sold_qty
+    FROM products p
+    WHERE p_category IS NULL OR p.category = p_category
+    UNION ALL
+    -- Deleted products that sold in the period (no category any more).
+    SELECT NULL, s.name, 'Uncategorized', true, s.qty
+    FROM sold s
+    WHERE s.product_id IS NULL AND p_category IS NULL
+  ),
+  ranked AS (
+    SELECT c.*,
+           RANK() OVER (ORDER BY sold_qty DESC) AS top_rank,
+           RANK() OVER (ORDER BY sold_qty ASC)  AS bottom_rank
+    FROM candidates c
+  )
+  SELECT jsonb_build_object(
+    'from',     p_from,
+    'to',       p_to,
+    'limit',    p_limit,
+    'category', p_category,
+    'most',  COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                         'rank', top_rank, 'product_id', product_id, 'name', name,
+                         'category', category, 'deleted', deleted, 'sold_qty', sold_qty)
+                       ORDER BY sold_qty DESC, name)
+                       FROM ranked WHERE top_rank <= p_limit AND sold_qty > 0), '[]'::jsonb),
+    'least', COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                         'rank', bottom_rank, 'product_id', product_id, 'name', name,
+                         'category', category, 'deleted', deleted, 'sold_qty', sold_qty)
+                       ORDER BY sold_qty ASC, name)
+                       FROM ranked WHERE bottom_rank <= p_limit), '[]'::jsonb)
+  );
+$$;
+
+REVOKE ALL ON FUNCTION sales_ranking(date, date, integer, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION sales_ranking(date, date, integer, text) TO service_role;

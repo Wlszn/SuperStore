@@ -76,12 +76,14 @@ class SalesReportController
             'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-6 days')) -> format('Y-m-d')),
             'to' => (string) ($_GET['to'] ?? $today),
             'category' => trim((string) ($_GET['category'] ?? '')),
+            'top' => (string) ($_GET['top'] ?? 3),
         ];
 
         //A single day is just a range where from = to.
         $from = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
         $to = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
         $report = null;
+        $top = filter_var($filters['top'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 20]]);
         $error = null;
         $categories = [];
         try{
@@ -90,8 +92,13 @@ class SalesReportController
                 $error = 'Choose a valid date range (\'from\' must be before \'to\').';
             } elseif($filters['category'] !== '' && !in_array($filters['category'], $categories, true)){
                 $error = 'Unknown category.';
+            } elseif($top === false){
+                $error = 'Choose how many items to show (1 to 20).';
             } else {
-                $report = (new SalesReportModel()) -> sales($from, $to, $filters['category'] ?: null);
+                $category = $filters['category'] ?: null;
+                $model = new SalesReportModel();
+                $report = $model->sales($from, $to, $category);
+                $ranking = $model->ranking($from, $to, $top, $category);
             }
         } catch(RuntimeException $e){
             $error = 'Could not load the sales report. Please try again.';
