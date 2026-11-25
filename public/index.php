@@ -90,6 +90,7 @@ $routes = [
     'POST /products/delete'  => [ProductController::class, 'delete'],
     'GET /api/receptions/latest' => [ProductController::class, 'latestReception'],
     'POST /receptions'       => [ProductController::class, 'receive'],
+    'GET /api/products/stock' => [ProductController::class, 'stock'],
 
     // Phase 3: scanners (used by management and self-checkout)
     'GET /api/products/lookup' => [ProductController::class, 'lookup'],

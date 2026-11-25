@@ -13,11 +13,12 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
 
 <dl class="stats">
     <div><dt><span data-i18n>Products</span></dt><dd><?= number_format(count($products)) ?></dd></div>
-    <div><dt><span data-i18n>Units in stock</span></dt><dd><?= number_format($units) ?></dd></div>
-    <div><dt><span data-i18n>Need restocking</span></dt><dd><?= number_format($restock) ?></dd></div>
+    <div><dt><span data-i18n>Units in stock</span></dt><dd id="units-in-stock"><?= number_format($units) ?></dd></div>
+    <div><dt><span data-i18n>Need restocking</span></dt><dd id="products-needing-restock"><?= number_format($restock) ?></dd></div>
 </dl>
 
-<section class="panel" aria-label="Product catalog" data-i18n-aria-label="Product catalog">
+<section class="panel" aria-label="Product catalog" data-i18n-aria-label="Product catalog"
+    data-inventory-url="/api/products/stock" data-low-stock="<?= (int) $lowStock ?>">
     <div class="toolbar">
         <input id="search" class="search" type="search" placeholder="Search name, category or barcode" data-i18n-placeholder="Search name, category or barcode" aria-label="Search name, category or barcode" data-i18n-aria-label="Search name, category or barcode">
         <label class="filter"><input type="checkbox" id="stock-filter"> <span data-i18n>Needs restocking</span></label>
@@ -36,7 +37,7 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
             <tbody>
             <?php foreach ($products as $product): ?>
                 <?php $stock = $product['in_stock']; $id = $product['id']; ?>
-                <tr data-product data-upc="<?= $e($product['upc'] ?? '') ?>" data-search="<?= $e(implode(' ', [$product['name'], $product['category'], $product['upc'], $product['producer']])) ?>" data-low="<?= $stock <= $lowStock ? 'true' : 'false' ?>">
+                <tr data-product data-product-id="<?= $id ?>" data-upc="<?= $e($product['upc'] ?? '') ?>" data-search="<?= $e(implode(' ', [$product['name'], $product['category'], $product['upc'], $product['producer']])) ?>" data-low="<?= $stock <= $lowStock ? 'true' : 'false' ?>">
                     <th scope="row">
                         <a class="product-name" href="/products/show?id=<?= $id ?>"><?= $e($product['name']) ?></a>
                         <span class="subtext"><?= $e($product['producer']) ?></span>
@@ -44,8 +45,8 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
                     <td><?= $e($product['category']) ?></td>
                     <td class="code"><?= $e($product['upc'] ?? '—') ?></td>
                     <td class="numeric"><?= $money($product['price']) ?></td>
-                    <td class="numeric"><?= number_format($stock) ?></td>
-                    <td><span data-i18n class="stock <?= $stock <= 0 ? 'out' : ($stock <= $lowStock ? 'low' : 'available') ?>"><?= $stock <= 0 ? 'Out of stock' : ($stock <= $lowStock ? 'Low stock' : 'In stock') ?></span></td>
+                    <td class="numeric" data-stock-count><?= number_format($stock) ?></td>
+                    <td><span data-stock-status data-i18n class="stock <?= $stock <= 0 ? 'out' : ($stock <= $lowStock ? 'low' : 'available') ?>"><?= $stock <= 0 ? 'Out of stock' : ($stock <= $lowStock ? 'Low stock' : 'In stock') ?></span></td>
                     <td><div class="row-actions"><a href="/products/edit?id=<?= $id ?>"><span data-i18n>Edit</span></a><a href="/products/receive?id=<?= $id ?>"><span data-i18n>Receive</span></a></div></td>
                 </tr>
             <?php endforeach; ?>
@@ -57,6 +58,7 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
     <?php else: ?>
         <p id="no-results" class="empty" hidden><span data-i18n>No products match your filters.</span></p>
     <?php endif; ?>
+    <div class="table-footer" id="inventory-live-status" role="status" aria-live="polite" data-i18n>Live inventory updates every 5 seconds.</div>
     <div class="table-footer" id="product-count" aria-live="polite" data-i18n><?= count($products) ?> <?= count($products) === 1 ? 'product' : 'products' ?></div>
 </section>
 <?php require __DIR__ . '/_end.php'; ?>

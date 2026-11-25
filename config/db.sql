@@ -152,3 +152,7 @@ INSERT INTO items (epc, product_id, reception_id) VALUES
   ('E28011700000020A1B2C3D01', 1, 1), ('E28011700000020A1B2C3D02', 1, 1),
   ('E28011700000020A1B2C3D03', 2, 2), ('E28011700000020A1B2C3D04', 2, 2), ('E28011700000020A1B2C3D05', 2, 2),
   ('E28011700000020A1B2C3D06', 3, 3);
+
+
+//added a new restock row 
+  Alter table products add last_restocked Date null;

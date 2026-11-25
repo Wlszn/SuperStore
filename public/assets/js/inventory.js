@@ -115,6 +115,72 @@
     search?.addEventListener('input', filterProducts);
     stockFilter?.addEventListener('change', filterProducts);
 
+    const inventory = document.querySelector('[data-inventory-url]');
+    if (inventory) {
+        const lowStock = Number(inventory.dataset.lowStock);
+        const liveStatus = document.getElementById('inventory-live-status');
+        const numberFormat = new Intl.NumberFormat(document.documentElement.lang || 'en');
+        let inventoryRequest;
+        let refreshFailed = false;
+
+        async function refreshInventory() {
+            if (document.hidden || inventoryRequest) return;
+
+            inventoryRequest = new AbortController();
+            try {
+                const response = await fetch(inventory.dataset.inventoryUrl, {
+                    cache: 'no-store',
+                    signal: inventoryRequest.signal,
+                });
+                if (!response.ok) throw new Error('Inventory request failed.');
+                const result = await response.json();
+                if (result.status !== 'success' || !Array.isArray(result.products)) {
+                    throw new Error('Invalid inventory response.');
+                }
+
+                const currentRows = new Map(rows.map(row => [Number(row.dataset.productId), row]));
+                let units = 0;
+                let restock = 0;
+                for (const product of result.products) {
+                    const stock = Number(product.in_stock);
+                    const row = currentRows.get(Number(product.id));
+                    if (!Number.isInteger(stock) || stock < 0 || !row) continue;
+
+                    units += stock;
+                    const isLow = stock <= lowStock;
+                    if (isLow) restock++;
+                    row.dataset.low = String(isLow);
+                    row.querySelector('[data-stock-count]').textContent = numberFormat.format(stock);
+
+                    const status = row.querySelector('[data-stock-status]');
+                    const label = stock <= 0 ? 'Out of stock' : (isLow ? 'Low stock' : 'In stock');
+                    status.classList.remove('out', 'low', 'available');
+                    status.classList.add(stock <= 0 ? 'out' : (isLow ? 'low' : 'available'));
+                    window.setLocalizedText(status, label);
+                }
+
+                document.getElementById('units-in-stock').textContent = numberFormat.format(units);
+                document.getElementById('products-needing-restock').textContent = numberFormat.format(restock);
+                filterProducts();
+                if (refreshFailed) {
+                    window.setLocalizedText(liveStatus, 'Live inventory updates every 5 seconds.');
+                    refreshFailed = false;
+                }
+            } catch (error) {
+                if (!inventoryRequest.signal.aborted) {
+                    window.setLocalizedText(liveStatus, 'Inventory updates unavailable. Retrying...');
+                    refreshFailed = true;
+                }
+            } finally {
+                inventoryRequest = undefined;
+            }
+        }
+
+        refreshInventory();
+        window.setInterval(refreshInventory, 5000);
+        document.addEventListener('visibilitychange', refreshInventory);
+    }
+
     const scanToggle = document.querySelector('.scan-toggle');
     scanToggle?.addEventListener('click', () => {
         const scan = document.getElementById('scan-product');

@@ -158,6 +158,8 @@
     "In stock": "En stock",
     "Low stock": "Stock faible",
     "Out of stock": "En rupture de stock",
+    "Live inventory updates every 5 seconds.": "Mise \u00e0 jour de l\u2019inventaire toutes les 5 secondes.",
+    "Inventory updates unavailable. Retrying...": "Mise \u00e0 jour de l\u2019inventaire indisponible. Nouvelle tentative...",
     "Status": "\u00c9tat",
     "Actions": "Actions",
     "No products yet.": "Aucun produit pour le moment.",

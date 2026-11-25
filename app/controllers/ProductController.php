@@ -23,6 +23,7 @@ use RuntimeException;
  *   POST /products/update              edit a product type                 (JSON)
  *   POST /products/delete              delete a product type               (JSON)
  *   POST /receptions                   record a delivery of tagged items   (JSON)
+ *   GET  /api/products/stock           every product with current stock    (JSON)
  *   GET  /api/products/lookup?code=    product type by barcode (UPC)       (JSON)
  *   GET  /api/items/lookup?epcs=A,B    what each RFID tag is               (JSON)
  */
@@ -57,6 +58,26 @@ class ProductController
             'products' => $products,
             'lowStock' => ProductModel::LOW_STOCK,
         ]);
+    }
+
+    /** GET /api/products/stock: current inventory for the admin product table. */
+    public function stock(): void
+    {
+        if (!isset($_SESSION['customer_id'])) {
+            jsonResponse(401, ['status' => 'error', 'message' => 'Please sign in first.']);
+            return;
+        }
+
+        if (empty($_SESSION['is_admin'])) {
+            jsonResponse(403, ['status' => 'error', 'message' => 'Only store administrators can view inventory.']);
+            return;
+        }
+
+        try {
+            jsonResponse(200, ['status' => 'success', 'products' => $this->products->all()]);
+        } catch (RuntimeException $e) {
+            $this->serverError();
+        }
     }
 
     // GET /products/create: the form with no product
