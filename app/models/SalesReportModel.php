@@ -39,4 +39,33 @@ class SalesReportModel{
     
         return $report;
     }
+
+    /** The $limit most and least sold product (ties at the cut-off included) */
+    public function ranking(DateTimeImmutable $from, DateTimeImmutable $to, int $limit, ?string $category = null): array
+    {
+        [$status, $ranking ] = supa_request('POST', 'rpc/sales_ranking', null, [
+            'p_from' => $from->format('Y-m-d'),
+            'p_to' => $to->format('Y-m-d'),
+            'p_limit' => $limit,
+            'p_category' => $category,
+        ]);
+        if($status !== 200 || !is_array($ranking)) {
+            error_log('sales_ranking failed (HTTP ' . $status . '): ' . json_encode($ranking));
+            throw new RuntimeException('Could not load the most and least sold items');
+        }
+
+        $clean = fn(array $p) => [
+            'rank' => (int) $p['rank'],
+            'product_id' => $p['product_id'] === null ? null : (int) $p['product_id'],
+            'name' => $p['name'],
+            'category' => $p['category'],
+            'deleted' => (bool) $p['deleted'],
+            'sold_qty' => (int) $p['sold_qty'],
+        ];
+        $ranking['most'] = array_map($clean, $ranking['most']);
+        $ranking['least'] = array_map($clean, $ranking['least']);
+        $ranking['limit'] = (int) $ranking['limit'];
+
+        return $ranking;
+    }
 }

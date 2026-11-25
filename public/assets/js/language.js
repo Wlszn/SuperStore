@@ -490,4 +490,13 @@
     "Uncategorized": "Sans catégorie",
     "No sales in this period.": "Aucune vente pour cette période.",
     "Try a wider date range or another category.": "Essayez une période plus large ou une autre catégorie.",
+        "Show top": "Afficher les",
+    "Most sold": "Les plus vendus",
+    "Least sold": "Les moins vendus",
+    "item": "article",
+    "items": "articles",
+    "(includes ties)": "(égalités incluses)",
+    "sold": "vendus",
+    "No products to rank.": "Aucun produit à classer.",
+    "Choose how many items to show (1 to 20).": "Choisissez combien d'articles afficher (1 à 20).",
 });

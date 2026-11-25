@@ -123,6 +123,14 @@ h2 { margin-bottom: 14px; font-size: 15px; font-weight: 650; }
 .stats dd.period { font-size: 16px; padding-top: 6px; }
 .report-filters { margin-bottom: 20px; }
 .report-filters label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.report-filters input[type=number] { width: 70px; }
+.ranking { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.ranking-list { padding: 14px 16px; }
+.ranking-list h2 { margin: 0; font-size: 15px; }
+.ranking-list ul { list-style: none; margin: 10px 0 0; padding: 0; }
+.ranking-list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
+.ranking-list .rank { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.ranking-list .empty { padding: 12px 0 0; }
 
 .panel { border: 1px solid var(--line); border-radius: 8px; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; }
@@ -219,6 +227,7 @@ dialog .notice { margin: 14px 0 0; }
     .stats.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats.four > div:nth-child(3) { border-left: 0; }
     .stats.four > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .ranking { grid-template-columns: 1fr; }
     .fields { grid-template-columns: 1fr; }
     .toolbar .search { width: 100%; }
 }

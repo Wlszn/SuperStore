@@ -8,7 +8,6 @@ use App\Models\CustomerModel;
 
 class AuthController
 {
-    private const GPIO_SCRIPT = __DIR__ . '/../../scripts/gpio_signal.py';
     public function register(): void
     {
         header('Content-Type: application/json');
@@ -38,14 +37,12 @@ class AuthController
         }
 
         if ($errors !== []) {
-            $this->triggerGPIO('fail');
             $this->respondWithErrors('Please fix the highlighted fields and try again.', $errors);
             return;
         }
 
         // 2. The email must not already be registered.
         if (CustomerModel::findByEmail($email) !== null) {
-            $this->triggerGPIO('fail');
             http_response_code(409);
             echo json_encode([
                 'status' => 'error',
@@ -60,7 +57,6 @@ class AuthController
         $customer->setPassword($password);
 
         if (!$customer->save()) {
-            $this->triggerGPIO('fail');
             http_response_code(500);
             echo json_encode([
                 'status' => 'error',
@@ -68,9 +64,6 @@ class AuthController
             ]);
             return;
         }
-
-        // Account created: light the blue LED.
-        $this->triggerGPIO('success');
 
         session_regenerate_id(true);
         $_SESSION['customer_id'] = $customer->getId();
@@ -162,15 +155,5 @@ class AuthController
             'message' => $message,
             'errors' => $errors,
         ]);
-    }
-
-    private function triggerGPIO(string $result): void
-    {
-        if (PHP_OS_FAMILY === 'Windows') {
-            return;
-        }
-        $script = escapeshellarg(self::GPIO_SCRIPT);
-        $resultArg = escapeshellarg($result);
-        shell_exec("python3 {$script} {$resultArg} > /dev/null 2>&1 &");
     }
 }

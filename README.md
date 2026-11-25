@@ -12,7 +12,7 @@ SuperStore is built in three phases, each adding to the last.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **1. Customer registration** | Sign-up and login with LED feedback | Done |
+| **1. Customer registration** | Sign-up and login | Done |
 | **2. IoT dashboard** | Fridge sensors over MQTT, thresholds, email alerts, fan control | Done |
 | **3. Store operations** | Product management, inventory, barcode/RFID scanning, self-checkout, loyalty points | In progress |
 
@@ -25,7 +25,6 @@ The application has two sides:
 
 **Phase 1: Registration**
 - Sign-up and login with server-side validation and hashed passwords
-- Blue LED on success, red LED on failure
 
 **Phase 2: Fridge monitoring**
 - Two ESP32 + DHT11 sensors publish temperature and humidity over MQTT (`Frig1`, `Frig2`)
@@ -97,7 +96,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ### 2. Database
 
-For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql` and `config/receipt_emails.sql`, in that order. Both are safe to run again on an existing database. Give your account admin access:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql` and `config/reports.sql`, in that order. All three are safe to run again on an existing database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -159,7 +158,6 @@ Design, relationships and examples: [`docs/ER.md`](docs/ER.md). Editable diagram
 
 | Component | Phase | Connection |
 |---|---|---|
-| Blue / red LEDs | 1 | GPIO 23 / GPIO 18 |
 | 2 × ESP32 + DHT11 | 2 | Wi-Fi (MQTT) |
 | DC motor + driver | 2 | GPIO 22 (enable), 27 (in 1), 17 (in 2) |
 | USB barcode scanner | 3 | USB (keyboard mode) |
