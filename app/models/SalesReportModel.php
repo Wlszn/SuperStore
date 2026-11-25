@@ -39,4 +39,24 @@ class SalesReportModel{
     
         return $report;
     }
+
+    /**Revenye and items sold per day or per week. Empty days/weeks come back as 0 */
+    public function trend(DateTimeImmutable $from, DateTimeImmutable $to, ?string $category, string $group): array{
+        [$status, $rows] = supa_request('POST', 'rpc/sales_trend', null, [
+            'p_from' => $from -> format('Y-m-d'),
+            'p_to' => $to -> format('Y-m-d'),
+            'p_category' => $category,
+            'p_group' => $group === 'week' ? 'week' : 'day',
+        ]);
+        if ($status !== 200 || !is_array($rows)){
+            error_log('sales-trend failed (HTTP ' . $status . '): ' . json_encode($rows));
+            throw new RuntimeException('Could not load the sales trend');
+        }
+
+        return array_map(fn (array $r) => [
+            'period' => (string) $r['period'],      // "2026-11-03"
+            'items_sold' => (int) $r['items_sold'],
+            'revenue' => (float) $r['revenue'],
+        ], $rows);
+    }
 }

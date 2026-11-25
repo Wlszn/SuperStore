@@ -490,4 +490,11 @@
     "Uncategorized": "Sans catégorie",
     "No sales in this period.": "Aucune vente pour cette période.",
     "Try a wider date range or another category.": "Essayez une période plus large ou une autre catégorie.",
+    "Export CSV": "Exporter en CSV",
+    "Chart": "Graphique",
+    "By day": "Par jour",
+    "By week": "Par semaine",
+    "Sales trend": "Tendance des ventes",
+    "Revenue per day": "Revenus par jour",
+    "Revenue per week (weeks start on Monday)": "Revenus par semaine (les semaines commencent le lundi)",
 });
