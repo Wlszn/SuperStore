@@ -120,6 +120,10 @@ if (isset($_SESSION['customer_id'])) {
         <span data-i18n>Already have an account?</span>
         <a href="/login"><span data-i18n>Sign in</span></a>
     </p>
+    <p class="switch-page guest-link">
+        <span data-i18n>Shopping without an account?</span>
+        <a href="/checkout"><span data-i18n>Go to self-checkout</span></a>
+    </p>
 
 </div>
 

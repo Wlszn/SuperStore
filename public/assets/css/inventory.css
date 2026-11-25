@@ -249,6 +249,8 @@ dialog .notice { margin: 14px 0 0; }
 }
 .reader-controls .hint { margin: 0; }
 .reader-controls .hint.error { color: var(--red); }
+.member-hint { margin: 10px 2px 0; }
+.member-hint.error { color: var(--red); }
 .reader-controls .button { margin-left: auto; }
 /* Green light while the RFID reader is listening (checkout and receive stock). */
 .reader-light { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #9aa4b1; }

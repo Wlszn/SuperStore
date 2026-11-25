@@ -65,8 +65,12 @@ if (isset($_SESSION['customer_id'])) {
     </form>
 
     <p class="switch-page">
-        New to SuperStore?
+        <span data-i18n>New to SuperStore?</span>
         <a href="/signup"><span data-i18n>Create an account</span></a>
+    </p>
+    <p class="switch-page guest-link">
+        <span data-i18n>Shopping without an account?</span>
+        <a href="/checkout"><span data-i18n>Go to self-checkout</span></a>
     </p>
 
 </div>
