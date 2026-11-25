@@ -100,7 +100,6 @@ $routes = [
     // Phase 4: reports (admin only)
     'GET /api/reports/sales' => [SalesReportController::class, 'sales'],
     'GET /reports/sales' => [App\Controllers\SalesReportController::class, 'page'],
-    'GET /reports/sales' => [App\Controllers\SalesReportController::class, 'page'],
     'GET /reports/sales/export' => [SalesReportController::class, 'export'],
 ];
 

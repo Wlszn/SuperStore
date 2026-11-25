@@ -105,3 +105,53 @@ $$;
 
 REVOKE ALL ON FUNCTION sales_ranking(date, date, integer, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sales_ranking(date, date, integer, text) TO service_role;
+
+
+-- Sales trend (spec 2): revenue and items sold per day or per week, for the line chart.
+-- Every day/week in the range is returned, with 0 when nothing sold (no gaps).
+-- Weeks start on Monday. Days are Montreal time, p_to is included.
+CREATE OR REPLACE FUNCTION sales_trend(p_from date, p_to date,
+                                       p_category text DEFAULT NULL,
+                                       p_group text DEFAULT 'day')
+RETURNS jsonb
+LANGUAGE sql STABLE
+SET search_path = public
+AS $$
+  WITH buckets AS (
+    -- One row per day (or per Monday) from the start to the end of the range.
+    SELECT gs::date AS bucket
+    FROM generate_series(
+      CASE WHEN p_group = 'week' THEN date_trunc('week', p_from::timestamp) ELSE p_from::timestamp END,
+      p_to::timestamp,
+      CASE WHEN p_group = 'week' THEN interval '1 week' ELSE interval '1 day' END
+    ) AS gs
+  ),
+  lines AS (
+    -- Same receipt lines and filters as sales_report().
+    SELECT (pu.purchased_at AT TIME ZONE 'America/Toronto')::date AS day,
+           pi.quantity, pi.unit_price
+    FROM purchase_items pi
+    JOIN purchases pu     ON pu.id = pi.purchase_id
+    LEFT JOIN products pr ON pr.id = pi.product_id
+    WHERE pu.purchased_at >= (p_from::timestamp     AT TIME ZONE 'America/Toronto')
+      AND pu.purchased_at <  ((p_to + 1)::timestamp AT TIME ZONE 'America/Toronto')
+      AND (p_category IS NULL OR pr.category = p_category)
+  ),
+  per_bucket AS (
+    SELECT CASE WHEN p_group = 'week' THEN date_trunc('week', day::timestamp)::date ELSE day END AS bucket,
+           SUM(quantity)::int                        AS items_sold,
+           SUM(unit_price * quantity)::numeric(12,2) AS revenue
+    FROM lines
+    GROUP BY 1
+  )
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+           'period',     b.bucket,
+           'items_sold', COALESCE(p.items_sold, 0),
+           'revenue',    COALESCE(p.revenue, 0)
+         ) ORDER BY b.bucket), '[]'::jsonb)
+  FROM buckets b
+  LEFT JOIN per_bucket p USING (bucket);
+$$;
+
+REVOKE ALL ON FUNCTION sales_trend(date, date, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION sales_trend(date, date, text, text) TO service_role;

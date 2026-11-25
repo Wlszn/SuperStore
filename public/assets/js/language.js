@@ -521,4 +521,11 @@
     "sold": "vendus",
     "No products to rank.": "Aucun produit à classer.",
     "Choose how many items to show (1 to 20).": "Choisissez combien d'articles afficher (1 à 20).",
+    "Export CSV": "Exporter en CSV",
+    "Chart": "Graphique",
+    "By day": "Par jour",
+    "By week": "Par semaine",
+    "Sales trend": "Tendance des ventes",
+    "Revenue per day": "Revenus par jour",
+    "Revenue per week (weeks start on Monday)": "Revenus par semaine (les semaines commencent le lundi)",
 });

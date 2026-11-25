@@ -10,5 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     form.addEventListener('change', update);
+    // Switching day/week reloads the chart right away.
+    form.addEventListener('change', (event) => {
+        if (event.target.name === 'group') form.requestSubmit();
+    });
     update();
 });

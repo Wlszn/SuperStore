@@ -131,6 +131,14 @@ h2 { margin-bottom: 14px; font-size: 15px; font-weight: 650; }
 .ranking-list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
 .ranking-list .rank { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
 .ranking-list .empty { padding: 12px 0 0; }
+.filter-group { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.trend-panel { padding: 16px; margin-bottom: 20px; }
+.trend-panel h2 { display: flex; gap: 10px; align-items: baseline; }
+.trend-chart { display: block; width: 100%; height: auto; }
+.trend-chart .grid { stroke: var(--line); }
+.trend-chart .axis { fill: var(--muted); font-size: 11px; }
+.trend-chart .line { fill: none; stroke: var(--blue); stroke-width: 2; stroke-linejoin: round; }
+.trend-chart .dot { fill: var(--blue); }
 
 .panel { border: 1px solid var(--line); border-radius: 8px; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; }
