@@ -237,10 +237,30 @@
                 ? 'Receive 1 item' : 'Receive {0} items'.replace('{0}', newTags.length));
         }
 
+        // The reader repeats every tag about twice a second while it lies on the pad. A tag not seen
+        // for RESCAN_MS was lifted off; if it comes back, it was scanned again.
+        const RESCAN_MS = 3000;
+        const lastSeen = new Map();     // epc -> when the reader last reported it
+        const registered = new Map();   // epc -> product name, for tags that already belong to an item
+        const removedTags = new Set();  // taken off the list: added again only if put back on the reader
+
         function addTags(items) {
+            const now = Date.now();
             let added = 0;
+            const alreadyRegistered = [];
+            let scannedAgain = 0;
             for (const item of items) {
-                if (listed.has(item.epc)) continue;
+                const putBack = now - (lastSeen.get(item.epc) ?? now) > RESCAN_MS;
+                lastSeen.set(item.epc, now);
+                if (removedTags.has(item.epc)) {
+                    if (!putBack) continue;
+                    removedTags.delete(item.epc);
+                }
+                if (listed.has(item.epc)) {
+                    if (putBack && registered.has(item.epc)) alreadyRegistered.push(registered.get(item.epc));
+                    else if (putBack) scannedAgain++;
+                    continue;
+                }
                 listed.add(item.epc);
                 const row = document.createElement('li');
                 const code = Object.assign(document.createElement('span'), { className: 'code', textContent: item.epc });
@@ -254,6 +274,7 @@
                         newTags.splice(newTags.indexOf(item.epc), 1);
                         row.remove();
                         listed.delete(item.epc);
+                        removedTags.add(item.epc);
                         renderTags();
                     };
                     row.append(remove);
@@ -261,11 +282,22 @@
                     const taken = Object.assign(document.createElement('span'), { className: 'tag-taken' });
                     window.setLocalizedText(taken, 'Already registered: {0}'.replace('{0}', item.product.name));
                     row.append(taken);
+                    registered.set(item.epc, item.product.name);
+                    alreadyRegistered.push(item.product.name);
                 }
                 tagList.append(row);
             }
             renderTags();
-            if (added) {
+            // One message per batch, the most important first.
+            if (alreadyRegistered.length) {
+                window.showNotification(alreadyRegistered.length === 1
+                    ? 'This tag is already registered ({0}). It will not be added again.'.replace('{0}', alreadyRegistered[0])
+                    : '{0} tags are already registered. They will not be added again.'.replace('{0}', alreadyRegistered.length), true);
+            } else if (scannedAgain) {
+                window.showNotification(scannedAgain === 1
+                    ? 'This tag was already scanned. It is counted once.'
+                    : '{0} tags were already scanned. Each one is counted once.'.replace('{0}', scannedAgain), true);
+            } else if (added) {
                 window.showNotification((added === 1 ? '{0} new tag read.' : '{0} new tags read.').replace('{0}', added));
             }
         }
@@ -277,6 +309,7 @@
         }
 
         function startReader() {
+            lastSeen.clear(); // the first read after (re)starting is not a re-scan
             stopFeed = window.startRfidFeed(addTags, setReaderStatus);
             window.setLocalizedText(reader, 'Stop reader');
         }

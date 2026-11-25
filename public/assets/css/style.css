@@ -64,6 +64,7 @@ input.invalid { border-color: #b13c2e; }
 .show-password input { margin: 0; }
 .container button { width: 100%; }
 .switch-page { text-align: center; margin: 20px 0 0; color: var(--muted); }
+.switch-page.guest-link { margin-top: 10px; padding-top: 14px; border-top: 1px solid #e3e8ee; }
 .form-message { padding: 11px; border: 1px solid var(--line); margin-bottom: 14px; }
 .form-message.success { color: #14614a; border-color: #badcd0; }
 .form-message.error { color: #a13e2b; border-color: #e9c1b8; }
