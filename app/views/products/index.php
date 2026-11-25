@@ -1,10 +1,14 @@
-<?php
+<?php;
+
+
 $title = 'Products';
 $section = 'products';
 require __DIR__ . '/_start.php';
 
 $units = array_sum(array_column($products, 'in_stock'));
 $restock = count(array_filter($products, static fn ($product) => $product['in_stock'] <= $lowStock));
+
+
 ?>
 <header class="page-heading">
     <div><h1><span data-i18n>Products</span></h1><p><span data-i18n>Manage your catalog and track what’s in stock.</span></p></div>
