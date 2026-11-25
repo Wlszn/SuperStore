@@ -161,27 +161,33 @@ class SalesReportController
             'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-6 days'))->format('Y-m-d')),
             'to' => (string) ($_GET['to'] ?? $today),
             'category' => trim((string) ($_GET['category'] ?? '')),
-            'group' => ($_GET['group'] ?? 'day') === 'week' ? 'week' : 'day',
+            'top' => (string) ($_GET['top'] ?? 3),
         ];
     }
 
-    /** A single day is just a range where from = to. */
-    private function period(array $filters): array
-    {
-        $single = $filters['mode'] === 'day';
-        return [
-            $this->date($single ? $filters['day'] : $filters['from']),
-            $this->date($single ? $filters['day'] : $filters['to']),
-        ];
-    }
-
-    private function filterError(array $filters, ?DateTimeImmutable $from, ?DateTimeImmutable $to, array $categories): ?string
-    {
-        if ($from === null || $to === null || $from > $to) {
-            return 'Choose a valid date range (\'from\' must be before \'to\').';
-        }
-        if ($filters['category'] !== '' && !in_array($filters['category'], $categories, true)) {
-            return 'Unknown category.';
+        //A single day is just a range where from = to.
+        $from = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
+        $to = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
+        $report = null;
+        $top = filter_var($filters['top'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 20]]);
+        $error = null;
+        $categories = [];
+        try{
+            $categories = (new ProductModel()) -> categories();
+            if($from === null || $to === null || $from > $to) {
+                $error = 'Choose a valid date range (\'from\' must be before \'to\').';
+            } elseif($filters['category'] !== '' && !in_array($filters['category'], $categories, true)){
+                $error = 'Unknown category.';
+            } elseif($top === false){
+                $error = 'Choose how many items to show (1 to 20).';
+            } else {
+                $category = $filters['category'] ?: null;
+                $model = new SalesReportModel();
+                $report = $model->sales($from, $to, $category);
+                $ranking = $model->ranking($from, $to, $top, $category);
+            }
+        } catch(RuntimeException $e){
+            $error = 'Could not load the sales report. Please try again.';
         }
         return null;
     }

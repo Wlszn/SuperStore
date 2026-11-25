@@ -64,43 +64,92 @@ require __DIR__ . '/products/_start.php';
         <button type="submit" class="button primary" style="margin-top:12px"><span data-i18n>Save membership barcode</span></button>
     </form>
 <?php else: ?>
-    <section class="panel">
+    <?php
+    // "Nov 20, 2026" for one day, "Oct 27 – Nov 25, 2026" for a range.
+    $period = '';
+    if ($historyError === null) {
+        $period = $from == $to
+            ? $from->format('M j, Y')
+            : $from->format($from->format('Y') === $to->format('Y') ? 'M j' : 'M j, Y') . ' – ' . $to->format('M j, Y');
+    }
+    $local = new DateTimeZone(date_default_timezone_get());
+    ?>
+    <form class="panel toolbar report-filters" method="get" action="/account">
+        <input type="hidden" name="tab" value="orders">
+        <label class="filter"><input type="radio" name="mode" value="day" <?= $filters['mode'] === 'day' ? 'checked' : '' ?>> <span data-i18n>Single day</span></label>
+        <label class="filter"><input type="radio" name="mode" value="range" <?= $filters['mode'] === 'range' ? 'checked' : '' ?>> <span data-i18n>Date range</span></label>
+        <label data-mode="day"><span data-i18n>Day</span> <input type="date" name="day" value="<?= $e($filters['day']) ?>"></label>
+        <label data-mode="range"><span data-i18n>From</span> <input type="date" name="from" value="<?= $e($filters['from']) ?>"></label>
+        <label data-mode="range"><span data-i18n>To</span> <input type="date" name="to" value="<?= $e($filters['to']) ?>"></label>
+        <button type="submit" class="button primary"><span data-i18n>Show receipts</span></button>
+    </form>
+
+    <section class="section-gap" aria-labelledby="history-heading">
         <div class="section-heading">
-            <h2><span data-i18n>Purchase history</span></h2>
+            <h2 id="history-heading"><span data-i18n>Receipt history</span></h2>
+            <?php if ($historyError === null): ?>
+                <p class="hint"><span data-i18n><?= $e(count($receipts) === 1 ? '1 receipt' : count($receipts) . ' receipts') ?></span> · <?= $e($period) ?></p>
+            <?php endif; ?>
         </div>
-        <div class="table-scroll compact" tabindex="0" role="region" aria-label="Purchase history" data-i18n-aria-label="Purchase history">
-            <table>
-                <thead>
-                    <tr>
-                        <th><span data-i18n>Date</span></th>
-                        <th><span data-i18n>Total</span></th>
-                        <th><span data-i18n>Points earned</span></th>
-                        <th data-i18n>Status</th>
-                        <th data-i18n>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($purchases as $purchase): ?>
-                        <tr>
-                            <td><?= $e((new DateTimeImmutable($purchase['purchased_at']))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('M j, Y H:i')) ?></td>
-                            <td><?= $money($purchase['total']) ?></td>
-                            <td><?= $e($purchase['points_earned']) ?></td>
-                            <td><span class="order-status" data-order-status="SS-<?= $e(str_pad((string) $purchase['id'], 6, '0', STR_PAD_LEFT)) ?>" data-i18n>In progress</span></td>
-                            <td>
-                                <div class="heading-actions">
-                                    <a class="button order-link receipt-link" href="/receipt?id=<?= (int) $purchase['id'] ?>" data-i18n>View receipt</a>
-                                    <a class="button order-link tracking-link" href="/receipt?id=<?= (int) $purchase['id'] ?>#tracking" data-i18n>Track order</a>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php if (!$purchases): ?>
-            <p class="empty"><span data-i18n>Your purchases will appear here.</span></p>
+
+        <?php if ($historyError !== null): ?>
+            <p class="empty field-error" role="alert"><span data-i18n><?= $e($historyError) ?></span></p>
+        <?php elseif ($receipts === []): ?>
+            <p class="panel empty"><span data-i18n>No receipts in this period.</span> <span data-i18n>Try a wider date range.</span></p>
         <?php endif; ?>
+
+        <?php foreach ($receipts as $receipt): ?>
+            <?php $reference = 'SS-' . str_pad((string) $receipt['id'], 6, '0', STR_PAD_LEFT); ?>
+            <article class="panel receipt-card" aria-labelledby="receipt-<?= $receipt['id'] ?>">
+                <header class="receipt-card-head">
+                    <div>
+                        <h3 id="receipt-<?= $receipt['id'] ?>"><?= $e((new DateTimeImmutable($receipt['purchased_at']))->setTimezone($local)->format('M j, Y · H:i')) ?></h3>
+                        <p class="hint"><span data-i18n>Order reference</span> <span class="code"><?= $e($reference) ?></span>
+                            <?php if (ORDER_TRACKING): ?> · <span class="order-status" data-order-status="<?= $e($reference) ?>" data-i18n>In progress</span><?php endif; ?></p>
+                    </div>
+                    <div class="heading-actions">
+                        <a class="button order-link receipt-link" href="/receipt?id=<?= $receipt['id'] ?>" data-i18n>View receipt</a>
+                        <?php if (ORDER_TRACKING): ?>
+                            <a class="button order-link tracking-link" href="/receipt?id=<?= $receipt['id'] ?>#tracking" data-i18n>Track order</a>
+                        <?php endif; ?>
+                    </div>
+                </header>
+                <div class="table-scroll compact">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col" data-i18n>Product</th>
+                                <th scope="col" class="numeric" data-i18n>Quantity</th>
+                                <th scope="col" class="numeric" data-i18n>Unit price</th>
+                                <th scope="col" class="numeric" data-i18n>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($receipt['items'] as $line): ?>
+                                <tr>
+                                    <td><?= $e($line['name']) ?></td>
+                                    <td class="numeric"><?= $line['quantity'] ?></td>
+                                    <td class="numeric"><?= $money($line['unit_price']) ?></td>
+                                    <td class="numeric"><?= $money($line['amount']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <dl class="receipt-card-totals">
+                    <?php if ($receipt['points_redeemed'] > 0): ?>
+                        <div><dt data-i18n>Subtotal</dt><dd><?= $money($receipt['subtotal']) ?></dd></div>
+                        <div><dt data-i18n>Points discount</dt><dd>−<?= $money($receipt['subtotal'] - $receipt['total']) ?></dd></div>
+                    <?php endif; ?>
+                    <div class="total"><dt data-i18n>Total</dt><dd><?= $money($receipt['total']) ?></dd></div>
+                    <?php if ($receipt['points_earned'] > 0): ?>
+                        <div><dt data-i18n>Points earned</dt><dd><?= $receipt['points_earned'] ?></dd></div>
+                    <?php endif; ?>
+                </dl>
+            </article>
+        <?php endforeach; ?>
     </section>
+    <script src="/assets/js/sales-report.js" defer></script>
     <?php if (ORDER_TRACKING): ?>
         <section id="sample-orders" class="panel editor-body section-gap" hidden>
             <h2 data-i18n>Online orders</h2>

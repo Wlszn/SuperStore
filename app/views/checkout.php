@@ -18,6 +18,9 @@ require __DIR__ . '/products/_start.php';
     <p id="reader-status" role="status" class="hint"><span data-i18n>Connecting to the RFID reader...</span></p>
     <button type="button" class="button" id="reader"><span data-i18n>Stop reader</span></button>
 </div>
+<?php if ($membershipCode === ''): ?>
+    <p class="hint member-hint" id="card-hint" role="status"><span data-i18n>Have a membership card? Scan it at any time to earn points.</span></p>
+<?php endif; ?>
 <section class="panel section-gap">
     <div class="table-scroll compact" tabindex="0" role="region" aria-label="Shopping basket" data-i18n-aria-label="Shopping basket">
         <table>
@@ -42,16 +45,24 @@ require __DIR__ . '/products/_start.php';
 
     <!-- Step 1: membership card, points and delivery -->
     <div id="step-details" class="payment-panel" hidden>
-        <h2 data-i18n>Step 1 of 3: Membership card</h2>
-        <?php if (!isset($_SESSION['customer_id'])): ?>
-            <p><a href="/login"><span data-i18n>Sign in</span></a> <span data-i18n>to earn points, or continue as a guest.</span></p>
-        <?php elseif ($membershipUnavailable): ?>
-            <p class="hint" data-i18n>Your membership code could not be loaded. You can still scan or enter it.</p>
+        <?php if ($membershipCode !== ''): ?>
+            <!-- Signed-in member: their own card is applied, nothing to scan. -->
+            <h2 data-i18n>Step 1 of 3: Your membership</h2>
+            <p><span data-i18n>Your membership card is applied:</span> <span class="code"><?= $e($membershipCode) ?></span></p>
+            <input type="hidden" id="membership-code" name="membership_code" value="<?= $e($membershipCode) ?>">
+            <p id="member-status" class="hint" role="status" hidden></p>
+        <?php else: ?>
+            <h2 data-i18n>Step 1 of 3: Scan your membership card</h2>
+            <?php if ($membershipUnavailable): ?>
+                <p class="hint" data-i18n>Your membership code could not be loaded. You can still scan or enter it.</p>
+            <?php endif; ?>
+            <p data-i18n>Hold your card's barcode under the scanner, or type its number. No card? Continue as a guest.</p>
+            <label for="membership-code"><span data-i18n>Membership card number</span></label>
+            <input id="membership-code" name="membership_code" value="" maxlength="64" autocomplete="off">
+            <p id="member-status" class="hint" role="status" hidden></p>
+            <p class="hint"><span data-i18n>Members earn 10 points per dollar and receive the receipt by email.</span>
+                <?php if (!isset($_SESSION['customer_id'])): ?><a href="/login"><span data-i18n>Sign in</span></a> <span data-i18n>to use your points.</span><?php endif; ?></p>
         <?php endif; ?>
-        <label for="membership-code"><span data-i18n>Membership card barcode (optional)</span></label>
-        <input id="membership-code" name="membership_code" value="<?= $e($membershipCode) ?>" maxlength="64" autocomplete="off">
-        <p id="member-status" class="hint" role="status" hidden></p>
-        <p class="hint"><span data-i18n>Earn 10 points per dollar and receive an emailed receipt with a membership code. Clear the field to continue as a guest.</span></p>
         <?php if ($membershipCode !== ''): ?>
             <div class="checkout-details" id="points-redemption" data-balance="<?= (int) ($profile['points'] ?? 0) ?>">
                 <label for="redeem-points" data-i18n>Use points</label>
@@ -87,6 +98,9 @@ require __DIR__ . '/products/_start.php';
         </div>
         <div class="heading-actions">
             <button type="button" class="button primary" id="details-next"><span data-i18n>Continue</span></button>
+            <?php if ($membershipCode === ''): ?>
+                <button type="button" class="button" id="skip-card"><span data-i18n>Continue without a card</span></button>
+            <?php endif; ?>
             <button type="button" class="button" data-back=""><span data-i18n>Back to basket</span></button>
         </div>
     </div>

@@ -40,12 +40,28 @@
     const readerLight = document.getElementById('reader-light');
 
     // One batch = everything the reader saw together: add it all, then one message.
+    // The reader repeats every tag about twice a second while it lies on the pad. A tag not seen
+    // for RESCAN_MS was lifted off; if it comes back, the customer scanned it again.
+    const RESCAN_MS = 3000;
+    const lastSeen = new Map(); // epc -> when the reader last reported it
+
     function addTags(items) {
         if (busy || step !== null) return;
+        const now = Date.now();
         let added = 0;
         const problems = [];
+        const inBasket = new Set();
         for (const item of items) {
-            if (tags.has(item.epc) || ignoredTags.has(item.epc)) continue;
+            const putBack = now - (lastSeen.get(item.epc) ?? now) > RESCAN_MS;
+            lastSeen.set(item.epc, now);
+            if (tags.has(item.epc)) {
+                if (putBack) inBasket.add(item.product.name); // the same item scanned again
+                continue;
+            }
+            if (ignoredTags.has(item.epc)) {
+                if (!putBack) continue; // still lying on the reader: stay quiet
+                ignoredTags.delete(item.epc); // removed earlier, put back now: check it again below
+            }
             if (item.status === 'in_stock') {
                 tags.set(item.epc, item.product);
                 added++;
@@ -56,11 +72,15 @@
                     : 'Unknown RFID tag: {0}'.replace('{0}', item.epc));
             }
         }
-        if (added) {
-            render();
+        if (added) render();
+        // One message per batch, the most important first.
+        if (problems.length) {
+            message(problems.join(' '), true);
+        } else if (inBasket.size) {
+            message('Already in your basket: {0}. Each item is counted once.'.replace('{0}', [...inBasket].join(', ')), true);
+        } else if (added) {
             message((added === 1 ? '{0} item added to your basket.' : '{0} items added to your basket.').replace('{0}', added));
         }
-        if (problems.length) message(problems.join(' '), true);
     }
 
     function setReaderStatus(text, isError) {
@@ -71,6 +91,7 @@
 
     function startReader() {
         if (stopFeed) return;
+        lastSeen.clear(); // the first read after (re)starting is not a re-scan
         stopFeed = window.startRfidFeed(addTags, setReaderStatus);
         window.setLocalizedText(reader, 'Stop reader');
     }
@@ -116,6 +137,7 @@
 
     // Membership card check: the result of the last lookup, or null when no valid card is entered.
     const memberStatus = document.getElementById('member-status');
+    const cardHint = document.getElementById('card-hint'); // basket screen, guests only
     let member = null;
 
     function showMember(paidCents) {
@@ -139,12 +161,44 @@
             member = result.member;
             updateTotal();
             message('Membership card accepted.');
+            if (cardHint) {
+                cardHint.classList.remove('error');
+                window.setLocalizedText(cardHint, 'Membership card accepted: {0}, {1} points.'
+                    .replace('{0}', member.first_name).replace('{1}', member.points));
+            }
         } catch (error) {
             const text = error.message || 'Membership lookup unavailable. Please retry.';
             memberStatus.classList.add('error');
             window.setLocalizedText(memberStatus, text);
+            if (cardHint) {
+                cardHint.classList.add('error');
+                window.setLocalizedText(cardHint, text);
+            }
             message(text, true);
         }
+    }
+
+    // Guests can scan their membership card at any time, even on the basket screen. The USB
+    // scanner types the number very fast and ends with Enter; a person typing is much slower.
+    if (cardHint) {
+        let scanned = '';
+        let lastKey = 0;
+        document.addEventListener('keydown', event => {
+            if (busy || (step !== null && step !== 'details') || event.target.closest('input, select, textarea')) return;
+            const now = Date.now();
+            if (now - lastKey > 60) scanned = '';
+            lastKey = now;
+            if (event.key === 'Enter') {
+                if (scanned.length >= 4) {
+                    event.preventDefault(); // don't press the focused button
+                    membership.value = scanned;
+                    lookUpMember();
+                }
+                scanned = '';
+            } else if (event.key.length === 1) {
+                scanned += event.key;
+            }
+        });
     }
 
     function render() {
@@ -348,6 +402,13 @@
     }
 
     document.getElementById('details-next').addEventListener('click', detailsNext);
+    document.getElementById('skip-card')?.addEventListener('click', () => {
+        membership.value = '';
+        member = null;
+        memberStatus.hidden = true;
+        updateTotal();
+        detailsNext();
+    });
     document.getElementById('confirm-list').addEventListener('click', () => showStep('payment'));
 
     document.getElementById('pay-card').addEventListener('click', () => {

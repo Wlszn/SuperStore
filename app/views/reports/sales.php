@@ -1,6 +1,7 @@
 <?php
 /** @var array $filters  @var string[] $categories  @var ?array $report  @var ?string $error */
 /** @var ?DateTimeImmutable $from  @var ?DateTimeImmutable $to  @var callable $e  @var callable $money */
+/**@var ?array $ranking*/
 $title = 'Sales report';
 $section = 'sales';
 require __DIR__ . '/../products/_start.php';
@@ -36,10 +37,9 @@ if ($report !== null) {
             <?php endforeach; ?>
         </select>
     </label>
-        <span class="filter-group"><span data-i18n>Chart</span>
-        <label class="filter"><input type="radio" name="group" value="day" <?= $filters['group'] === 'day' ? 'checked' : '' ?>> <span data-i18n>By day</span></label>
-        <label class="filter"><input type="radio" name="group" value="week" <?= $filters['group'] === 'week' ? 'checked' : '' ?>> <span data-i18n>By week</span></label>
-    </span>
+        <label><span data-i18n>Show top</span>
+        <input type="number" name="top" min="1" max="20" value="<?= $e($filters['top']) ?>">
+    </label>
     <button type="submit" class="button primary"><span data-i18n>Show report</span></button>
 </form>
 
@@ -55,6 +55,36 @@ if ($report !== null) {
         <div><dt><span data-i18n>Items sold</span></dt><dd><?= number_format($report['items_sold']) ?></dd></div>
         <div><dt><span data-i18n>Period</span></dt><dd class="period"><?= $e($period) ?></dd></div>
     </dl>
+    <div class="ranking">
+        <?php foreach (['most' => 'Most sold', 'least' => 'Least sold'] as $key => $label): ?>
+            <?php $list = $ranking[$key]; ?>
+            <section class="panel ranking-list" aria-label="<?= $e($label) ?>" data-i18n-aria-label="<?= $e($label) ?>">
+                <h2><span data-i18n><?= $e($label) ?></span></h2>
+                <p class="subtext">
+                    <?= $e($period) ?> · <?= count($list) ?> <span data-i18n><?= count($list) === 1 ? 'item' : 'items' ?></span>
+                    <?php if (count($list) > $ranking['limit']): ?>
+                        <span data-i18n>(includes ties)</span>
+                    <?php endif; ?>
+                </p>
+                <?php if ($list === []): ?>
+                    <p class="empty"><span data-i18n><?= $key === 'most' ? 'No sales in this period.' : 'No products to rank.' ?></span></p>
+                <?php else: ?>
+                    <ul>
+                        <?php foreach ($list as $item): ?>
+                            <li>
+                                <span>
+                                    <span class="rank">#<?= $item['rank'] ?></span>
+                                    <?= $e($item['name']) ?>
+                                    <?php if ($item['deleted']): ?><span class="subtext" data-i18n>Deleted product</span><?php endif; ?>
+                                </span>
+                                <strong><?= number_format($item['sold_qty']) ?> <span data-i18n>sold</span></strong>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </section>
+        <?php endforeach; ?>
+    </div>
 
     <section class="panel trend-panel" aria-label="Sales trend" data-i18n-aria-label="Sales trend">
         <h2><span data-i18n>Sales trend</span>

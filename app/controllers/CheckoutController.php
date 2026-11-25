@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\ScanModel;
+use App\Models\PurchaseHistoryModel;
 use App\Services\SupaClient;
+use DateTimeImmutable;
 use RuntimeException;
 use function config\supa_request;
 
@@ -227,16 +229,38 @@ class CheckoutController
                 'id' => 'eq.' . $_SESSION['customer_id'],
                 'select' => 'name,email,phone,address,membership_number,points',
             ])[0] ?? null;
-            $purchases = SupaClient::rows('GET', 'purchases', [
-                'customer_id' => 'eq.' . $_SESSION['customer_id'],
-                'order' => 'purchased_at.desc',
-                'select' => 'id,total,points_earned,purchased_at',
-            ]);
+            // Orders tab (P4-17): receipts for one day or a date range, the last 30 days by default.
+            $today = (new DateTimeImmutable('today'))->format('Y-m-d');
+            $filters = [
+                'mode' => ($_GET['mode'] ?? 'range') === 'day' ? 'day' : 'range',
+                'day' => (string) ($_GET['day'] ?? $today),
+                'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-29 days'))->format('Y-m-d')),
+                'to' => (string) ($_GET['to'] ?? $today),
+            ];
+            // A single day is a range where from = to.
+            $from = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
+            $to = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
+            $receipts = [];
+            $historyError = null;
+            if ($from === null || $to === null || $from > $to) {
+                $historyError = 'Choose a valid date range (\'from\' must be before \'to\').';
+            } else {
+                // The session's customer id: customers only ever see their own receipts.
+                $receipts = (new PurchaseHistoryModel())->receipts((int) $_SESSION['customer_id'], $from, $to);
+            }
             require APP_ROOT . '/app/views/account.php';
         } catch (RuntimeException $error) {
             http_response_code(503);
             echo 'Your account is temporarily unavailable. Please reload the page.';
         }
+    }
+
+    /** "2026-11-20" -> date, anything else -> null. */
+    private function date(string $value): ?DateTimeImmutable
+    {
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $date && $date->format('Y-m-d') === $value ? $date : null;
     }
 
     public function receipt(): void

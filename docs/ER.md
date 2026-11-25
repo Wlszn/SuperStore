@@ -2,7 +2,7 @@
 
 ![Phase 3 ER diagram](SuperStore-ERD.png)
 
-Editable source: [`SuperStore-ERD.drawio`](SuperStore-ERD.drawio) (open it at app.diagrams.net). Full SQL: the Phase 3 section of [`config/db.sql`](../config/db.sql).
+Editable source: [`SuperStore-ERD.drawio`](SuperStore-ERD.drawio) (open it at app.diagrams.net). Full SQL: the tables are in [`config/db.sql`](../config/db.sql); receiving stock, checkout and the upgrade of older databases are in [`config/checkout.sql`](../config/checkout.sql); the email queue is in [`config/receipt_emails.sql`](../config/receipt_emails.sql) and the sales report in [`config/reports.sql`](../config/reports.sql).
 
 ## Tables
 
@@ -16,6 +16,7 @@ Editable source: [`SuperStore-ERD.drawio`](SuperStore-ERD.drawio) (open it at ap
 | `purchases` | One checkout, which is one receipt | Self-checkout |
 | `purchase_items` | One line on a receipt (product, quantity, price) | Self-checkout |
 | `rfid_scans` | One tag read by the RFID reader | Management, self-checkout |
+| `receipt_emails` | One receipt email to send (one per member purchase), with its status and attempts | Receipt worker |
 | `product_stock` *(view)* | A product with its `in_stock` = its items not sold yet | Management |
 
 ## Relationships

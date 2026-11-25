@@ -25,7 +25,7 @@ require __DIR__ . '/_start.php';
                     <select id="received-product" name="product_id" required>
                         <option value="" data-i18n>Choose a product</option>
                         <?php foreach ($products as $product): ?>
-                            <option value="<?= $product['id'] ?>" data-upc="<?= $e($product['upc'] ?? '') ?>" <?= $product['id'] === $selectedId ? 'selected' : '' ?>><?= $e($product['name'] . (($product['upc'] ?? '') !== '' ? ' · ' . $product['upc'] : '')) ?></option>
+                            <option value="<?= $product['id'] ?>" data-upc="<?= $e($product['upc'] ?? '') ?>" <?= $product['id'] === $selectedId ? 'selected' : '' ?>><?= $e($product['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                     <span data-error="product_id" class="field-error"></span>
