@@ -512,7 +512,7 @@
     "Uncategorized": "Sans catégorie",
     "No sales in this period.": "Aucune vente pour cette période.",
     "Try a wider date range or another category.": "Essayez une période plus large ou une autre catégorie.",
-        "Show top": "Afficher les",
+    "Show top": "Afficher les",
     "Most sold": "Les plus vendus",
     "Least sold": "Les moins vendus",
     "item": "article",

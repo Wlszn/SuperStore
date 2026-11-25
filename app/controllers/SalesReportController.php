@@ -57,27 +57,113 @@ class SalesReportController
     }
 
     //GET /reports/sales: the Sales Report page (admin only)
-    public function page(): void{
-        if(!isset($_SESSION['customer_id'])){
-            header('Location: /login');
-            return;
+        //GET /reports/sales: the Sales Report page (admin only)
+    public function page(): void
+    {
+        if (!$this->adminPageAllowed()) return;
+
+        $filters = $this->readFilters();
+        [$from, $to] = $this->period($filters);
+        $report = null;
+        $trend = [];
+        $error = null;
+        $categories = [];
+        try {
+            $categories = (new ProductModel())->categories();
+            $error = $this->filterError($filters, $from, $to, $categories);
+            if ($error === null) {
+                $model = new SalesReportModel();
+                $category = $filters['category'] ?: null;
+                $report = $model->sales($from, $to, $category);
+                $trend = $model->trend($from, $to, $category, $filters['group']);
+            }
+        } catch (RuntimeException $e) {
+            $error = 'Could not load the sales report. Please try again.';
         }
-        if(empty($_SESSION['is_admin'])){
-            http_response_code(403);
-            echo 'Only store administrators can see reports. <a href="/">Back</a>';
+
+        require APP_ROOT . '/app/views/reports/sales.php';
+    }
+
+    //GET /reports/sales/export: the sales table as a CSV download (same filters as the page)
+    public function export(): void
+    {
+        if (!$this->adminPageAllowed()) return;
+
+        $filters = $this->readFilters();
+        [$from, $to] = $this->period($filters);
+        try {
+            $error = $this->filterError($filters, $from, $to, (new ProductModel())->categories());
+            $report = $error === null
+                ? (new SalesReportModel())->sales($from, $to, $filters['category'] ?: null)
+                : null;
+        } catch (RuntimeException $e) {
+            $error = 'Could not load the sales report. Please try again.';
+        }
+        if ($error !== null) {
+            http_response_code(422);
+            echo htmlspecialchars($error) . ' <a href="/reports/sales">Back</a>';
             return;
         }
 
-        //Defaults: the last 7 days, all categories.
-        $today = (new DateTimeImmutable('today')) -> format('Y-m-d');
-        $filters = [
+        $period = $from == $to
+            ? $from->format('Y-m-d')
+            : $from->format('Y-m-d') . ' to ' . $to->format('Y-m-d');
+        $name = 'sales-' . $from->format('Y-m-d') . '_' . $to->format('Y-m-d')
+            . ($filters['category'] !== '' ? '-' . preg_replace('/[^A-Za-z0-9]+/', '-', $filters['category']) : '');
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $name . '.csv"');
+
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF");   // UTF-8 BOM so Excel shows accents correctly
+        $put = fn (array $row) => fputcsv($out, array_map([$this, 'csvCell'], $row), ',', '"', '');
+
+        $put(['Product', 'Category', 'Sold quantity', 'Revenue', 'Period']);
+        foreach ($report['products'] as $p) {
+            $put([
+                $p['name'] . ($p['deleted'] ? ' (deleted)' : ''),
+                $p['category'],
+                $p['sold_qty'],
+                number_format($p['revenue'], 2, '.', ''),
+                $period,
+            ]);
+        }
+        fwrite($out, "\n");
+        $put(['Total', '', $report['items_sold'], number_format($report['total_sales'], 2, '.', ''), $period]);
+        if ($report['amount_paid'] !== null) {
+            $put(['Paid after points', '', '', number_format($report['amount_paid'], 2, '.', ''), $period]);
+        }
+        fclose($out);
+    }
+
+    /** Login redirect / 403 for report pages. Returns true when the admin may continue. */
+    private function adminPageAllowed(): bool
+    {
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: /login');
+            return false;
+        }
+        if (empty($_SESSION['is_admin'])) {
+            http_response_code(403);
+            echo 'Only store administrators can see reports. <a href="/">Back</a>';
+            return false;
+        }
+        return true;
+    }
+
+    /** Filters from the query string. Defaults: the last 7 days, all categories, by day. */
+    private function readFilters(): array
+    {
+        $today = (new DateTimeImmutable('today'))->format('Y-m-d');
+        return [
             'mode' => ($_GET['mode'] ?? 'range') === 'day' ? 'day' : 'range',
             'day' => (string) ($_GET['day'] ?? $today),
-            'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-6 days')) -> format('Y-m-d')),
+            'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-6 days'))->format('Y-m-d')),
             'to' => (string) ($_GET['to'] ?? $today),
             'category' => trim((string) ($_GET['category'] ?? '')),
             'top' => (string) ($_GET['top'] ?? 3),
         ];
+    }
 
         //A single day is just a range where from = to.
         $from = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
@@ -103,7 +189,13 @@ class SalesReportController
         } catch(RuntimeException $e){
             $error = 'Could not load the sales report. Please try again.';
         }
+        return null;
+    }
 
-        require APP_ROOT . '/app/views/reports/sales.php';
+    /** Stops Excel from running a product name like "=HYPERLINK(...)" as a formula. */
+    private function csvCell(mixed $value): string
+    {
+        $value = (string) $value;
+        return preg_match('/^[=+\-@\t\r]/', $value) ? "'" . $value : $value;
     }
 }
