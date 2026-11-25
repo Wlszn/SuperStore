@@ -57,7 +57,6 @@ class SalesReportController
     }
 
     //GET /reports/sales: the Sales Report page (admin only)
-        //GET /reports/sales: the Sales Report page (admin only)
     public function page(): void
     {
         if (!$this->adminPageAllowed()) return;
@@ -65,6 +64,7 @@ class SalesReportController
         $filters = $this->readFilters();
         [$from, $to] = $this->period($filters);
         $report = null;
+        $ranking = null;
         $trend = [];
         $error = null;
         $categories = [];
@@ -75,7 +75,8 @@ class SalesReportController
                 $model = new SalesReportModel();
                 $category = $filters['category'] ?: null;
                 $report = $model->sales($from, $to, $category);
-                $trend = $model->trend($from, $to, $category, $filters['group']);
+                $ranking = $model->ranking($from, $to, $this->topLimit($filters), $category);   // P4-11
+                $trend = $model->trend($from, $to, $category, $filters['group']);              // P4-12
             }
         } catch (RuntimeException $e) {
             $error = 'Could not load the sales report. Please try again.';
@@ -151,7 +152,7 @@ class SalesReportController
         return true;
     }
 
-    /** Filters from the query string. Defaults: the last 7 days, all categories, by day. */
+    /** Filters from the query string. Defaults: last 7 days, all categories, top 3, by day. */
     private function readFilters(): array
     {
         $today = (new DateTimeImmutable('today'))->format('Y-m-d');
@@ -161,33 +162,37 @@ class SalesReportController
             'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-6 days'))->format('Y-m-d')),
             'to' => (string) ($_GET['to'] ?? $today),
             'category' => trim((string) ($_GET['category'] ?? '')),
-            'top' => (string) ($_GET['top'] ?? 3),
+            'top' => (string) ($_GET['top'] ?? 3),                                   // P4-11
+            'group' => ($_GET['group'] ?? 'day') === 'week' ? 'week' : 'day',        // P4-12
         ];
     }
 
-        //A single day is just a range where from = to.
-        $from = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
-        $to = $this -> date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
-        $report = null;
-        $top = filter_var($filters['top'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 20]]);
-        $error = null;
-        $categories = [];
-        try{
-            $categories = (new ProductModel()) -> categories();
-            if($from === null || $to === null || $from > $to) {
-                $error = 'Choose a valid date range (\'from\' must be before \'to\').';
-            } elseif($filters['category'] !== '' && !in_array($filters['category'], $categories, true)){
-                $error = 'Unknown category.';
-            } elseif($top === false){
-                $error = 'Choose how many items to show (1 to 20).';
-            } else {
-                $category = $filters['category'] ?: null;
-                $model = new SalesReportModel();
-                $report = $model->sales($from, $to, $category);
-                $ranking = $model->ranking($from, $to, $top, $category);
-            }
-        } catch(RuntimeException $e){
-            $error = 'Could not load the sales report. Please try again.';
+    /** A single day is just a range where from = to. */
+    private function period(array $filters): array
+    {
+        $single = $filters['mode'] === 'day';
+        return [
+            $this->date($single ? $filters['day'] : $filters['from']),
+            $this->date($single ? $filters['day'] : $filters['to']),
+        ];
+    }
+
+    /** How many most/least sold items to show: 1 to 20, or false if invalid. */
+    private function topLimit(array $filters): int|false
+    {
+        return filter_var($filters['top'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 20]]);
+    }
+
+    private function filterError(array $filters, ?DateTimeImmutable $from, ?DateTimeImmutable $to, array $categories): ?string
+    {
+        if ($from === null || $to === null || $from > $to) {
+            return 'Choose a valid date range (\'from\' must be before \'to\').';
+        }
+        if ($filters['category'] !== '' && !in_array($filters['category'], $categories, true)) {
+            return 'Unknown category.';
+        }
+        if ($this->topLimit($filters) === false) {
+            return 'Choose how many items to show (1 to 20).';
         }
         return null;
     }

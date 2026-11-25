@@ -40,6 +40,10 @@ if ($report !== null) {
         <label><span data-i18n>Show top</span>
         <input type="number" name="top" min="1" max="20" value="<?= $e($filters['top']) ?>">
     </label>
+    <span class="filter-group"><span data-i18n>Chart</span>
+        <label class="filter"><input type="radio" name="group" value="day" <?= $filters['group'] === 'day' ? 'checked' : '' ?>> <span data-i18n>By day</span></label>
+        <label class="filter"><input type="radio" name="group" value="week" <?= $filters['group'] === 'week' ? 'checked' : '' ?>> <span data-i18n>By week</span></label>
+    </span>
     <button type="submit" class="button primary"><span data-i18n>Show report</span></button>
 </form>
 

@@ -1,4 +1,11 @@
 <?php
+/**
+ * Top of every admin page. The page that requires this file sets these first.
+ *
+ * @var string     $title    page title, e.g. 'Sales report'
+ * @var string     $section  menu item to highlight, e.g. 'sales'
+ * @var array|null $product  only on product pages
+ */
 $e = static fn ($value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $money = static fn ($value): string => '$' . number_format((float) $value, 2);
 ?>
