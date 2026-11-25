@@ -16,6 +16,9 @@ if ($report !== null) {
 ?>
 <header class="page-heading">
     <div><h1><span data-i18n>Sales report</span></h1><p><span data-i18n>Sold items and revenue for a day or a date range.</span></p></div>
+    <?php if ($report !== null): ?>
+        <a class="button" href="/reports/sales/export?<?= $e(http_build_query($filters)) ?>"><span data-i18n>Export CSV</span></a>
+    <?php endif; ?>
 </header>
 
 <form class="panel toolbar report-filters" method="get" action="/reports/sales">
@@ -37,6 +40,10 @@ if ($report !== null) {
         <label><span data-i18n>Show top</span>
         <input type="number" name="top" min="1" max="20" value="<?= $e($filters['top']) ?>">
     </label>
+    <span class="filter-group"><span data-i18n>Chart</span>
+        <label class="filter"><input type="radio" name="group" value="day" <?= $filters['group'] === 'day' ? 'checked' : '' ?>> <span data-i18n>By day</span></label>
+        <label class="filter"><input type="radio" name="group" value="week" <?= $filters['group'] === 'week' ? 'checked' : '' ?>> <span data-i18n>By week</span></label>
+    </span>
     <button type="submit" class="button primary"><span data-i18n>Show report</span></button>
 </form>
 
@@ -82,6 +89,12 @@ if ($report !== null) {
             </section>
         <?php endforeach; ?>
     </div>
+
+    <section class="panel trend-panel" aria-label="Sales trend" data-i18n-aria-label="Sales trend">
+        <h2><span data-i18n>Sales trend</span>
+            <span class="subtext" data-i18n><?= $filters['group'] === 'week' ? 'Revenue per week (weeks start on Monday)' : 'Revenue per day' ?></span></h2>
+        <?php $group = $filters['group']; require __DIR__ . '/_trend-chart.php'; ?>
+    </section>
 
     <section class="panel" aria-label="Sold items by product" data-i18n-aria-label="Sold items by product">
         <?php if ($report['products'] === []): ?>

@@ -131,10 +131,18 @@ h2 { margin-bottom: 14px; font-size: 15px; font-weight: 650; }
 .ranking-list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
 .ranking-list .rank { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
 .ranking-list .empty { padding: 12px 0 0; }
+.filter-group { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.trend-panel { padding: 16px; margin-bottom: 20px; }
+.trend-panel h2 { display: flex; gap: 10px; align-items: baseline; }
+.trend-chart { display: block; width: 100%; height: auto; }
+.trend-chart .grid { stroke: var(--line); }
+.trend-chart .axis { fill: var(--muted); font-size: 11px; }
+.trend-chart .line { fill: none; stroke: var(--blue); stroke-width: 2; stroke-linejoin: round; }
+.trend-chart .dot { fill: var(--blue); }
 
 .panel { border: 1px solid var(--line); border-radius: 8px; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px; }
-input:not([type=checkbox]), select {
+input:not([type=checkbox]):not([type=radio]), select {
     width: 100%;
     min-width: 0;
     min-height: 37px;
@@ -509,3 +517,13 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
     .live.on .live-dot, .fan-control.on .fan-icon { animation: none; }
     .gauge-fill { transition: none; }
 }
+/* Receipt history on the account page (P4-17) */
+.receipt-card { margin-bottom: 16px; }
+.receipt-card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 16px 10px; }
+.receipt-card-head h3 { margin: 0 0 2px; font-size: 15px; }
+.receipt-card-head .hint { margin: 0; }
+.receipt-card-totals { display: grid; justify-content: end; gap: 4px; margin: 0; padding: 10px 16px 14px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.receipt-card-totals div { display: grid; grid-template-columns: 140px 90px; }
+.receipt-card-totals dt { color: var(--muted); }
+.receipt-card-totals dd { margin: 0; text-align: right; }
+.receipt-card-totals .total dt, .receipt-card-totals .total dd { color: var(--text); font-weight: 700; }
