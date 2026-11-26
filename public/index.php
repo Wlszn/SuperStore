@@ -85,6 +85,7 @@ $routes = [
     'GET /products/edit'     => [ProductController::class, 'edit'],
     'GET /products/show'     => [ProductController::class, 'show'],
     'GET /products/receive'  => [ProductController::class, 'receiveForm'],
+    'GET /products/export'   => [ProductController::class, 'export'],
     'POST /products'         => [ProductController::class, 'store'],
     'POST /products/update'  => [ProductController::class, 'update'],
     'POST /products/delete'  => [ProductController::class, 'delete'],

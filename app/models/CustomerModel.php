@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use DateTime;
+
 use function config\supa_delete_customer;
 use function config\supa_find_customer_by_email;
 use function config\supa_find_customer_by_id;
@@ -284,6 +286,7 @@ class CustomerModel
             (int) ($data['points'] ?? 0)
         );
     }
+
 
     public function toArray(): array
     {

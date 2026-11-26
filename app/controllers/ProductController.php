@@ -80,6 +80,44 @@ class ProductController
         }
     }
 
+    /** GET /products/export: download every product and its current stock as CSV. */
+    public function export(): void
+    {
+        if (!$this->allowPage()) {
+            return;
+        }
+
+        try {
+            $products = $this->products->all();
+        } catch (RuntimeException $e) {
+            $this->pageError(500, 'Could not load the inventory. Please try again.');
+            return;
+        }
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="products-' . date('Y-m-d') . '.csv"');
+
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, ['Product', 'Category', 'Barcode', 'Price', 'In stock', 'Status', 'Producer'], ',', '"', '');
+
+        foreach ($products as $product) {
+            $stock = (int) $product['in_stock'];
+            fputcsv($out, [
+                $this->csvCell($product['name']),
+                $this->csvCell($product['category']),
+                $this->csvCell($product['upc'] ?? ''),
+                number_format((float) $product['price'], 2, '.', ''),
+                $stock,
+                $stock <= 0 ? 'Out of stock' : ($stock <= ProductModel::LOW_STOCK ? 'Low stock' : 'In stock'),
+                $this->csvCell($product['producer']),
+            ], ',', '"', '');
+        }
+
+        fclose($out);
+        exit;
+    }
+
     // GET /products/create: the form with no product
     public function create(): void
     {
@@ -449,6 +487,13 @@ class ProductController
 
         extract($data);
         require $file;
+    }
+
+    /** Stops Excel from treating names or categories beginning with a formula character as formulas. */
+    private function csvCell(mixed $value): string
+    {
+        $value = (string) $value;
+        return preg_match('/^[=+\-@\t\r]/', $value) ? "'" . $value : $value;
     }
 
     private function pageError(int $status, string $message): void
