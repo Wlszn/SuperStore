@@ -53,11 +53,10 @@ The application has two sides:
 ## Architecture
 
 ```
-ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ──HTTP──▶ ┐
-RFID reader ───────────▶ reader script ────HTTP──────────▶ │ PHP app (Pi) ──REST──▶ Supabase
-Barcode scanner ──▶ browser (types like a keyboard) ─────▶ │
-                         fan.py ◀── GET /api/fan ───────── ┘
-                           └──GPIO──▶ motor driver ──▶ DC motor
+ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ◀──HTTP──▶ ┐
+RFID reader ───────────▶ reader script ────HTTP────────────▶ │ PHP app (Pi) ──REST──▶ Supabase
+Barcode scanner ──▶ browser (types like a keyboard) ───────▶ ┘
+                         monitor.py ──GPIO──▶ motor driver ──▶ DC motor
 ```
 
 Devices never talk to the database directly: every device and page goes through the PHP API, and only the models talk to Supabase.
@@ -109,11 +108,10 @@ sudo apt install php-cli php-curl mosquitto python3-gpiozero python3-paho-mqtt p
 php -S 0.0.0.0:8000 -t public
 ```
 
-In separate terminals:
+In a second terminal, start the Phase 2 script (fridge readings, alert emails and the fan motor):
 
 ```bash
-python3 scripts/monitor.py   # fridge readings and email alerts
-python3 scripts/fan.py       # fan motor
+python3 scripts/monitor.py
 ```
 
 Allow the ESP32 boards to reach the broker (`/etc/mosquitto/conf.d/superstore.conf`), then restart Mosquitto:
@@ -125,7 +123,7 @@ allow_anonymous true
 
 ### 4. ESP32 boards
 
-Open `scripts/mqtt.py` (an Arduino sketch) in the Arduino IDE, install **PubSubClient** and **DHT sensor library**, set the Wi-Fi credentials and the Pi's IP address, and flash one board with `TOPIC = "Frig1"` and the other with `"Frig2"`.
+Open `scripts/esp32_sensor/esp32_sensor.ino` in the Arduino IDE, install **PubSubClient** and **DHT sensor library**, set the Wi-Fi credentials and the Pi's IP address, and flash one board with `TOPIC = "Frig1"` and the other with `"Frig2"`.
 
 ### 5. RFID reader
 
