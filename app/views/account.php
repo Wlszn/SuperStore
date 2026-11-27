@@ -1,7 +1,7 @@
 <?php
 $title = 'My account';
 $section = 'account';
-$tabs = ['profile' => 'Profile', 'membership' => 'Membership', 'orders' => 'Orders'];
+$tabs = ['profile' => 'Profile', 'membership' => 'Membership', 'orders' => 'Orders', 'prices' => 'Price history'];
 $tab = $_GET['tab'] ?? 'profile';
 if (!is_string($tab) || !isset($tabs[$tab])) {
     $tab = 'profile';
@@ -63,6 +63,134 @@ require __DIR__ . '/products/_start.php';
         <input id="member-barcode" name="membership_number" value="<?= $e($customer['membership_number'] ?? '') ?>" maxlength="64" required autocomplete="off">
         <button type="submit" class="button primary" style="margin-top:12px"><span data-i18n>Save membership barcode</span></button>
     </form>
+<?php elseif ($tab === 'prices'): ?>
+    <?php
+    // P4-19: how many times an item was bought, at what price, and how the price changed.
+    $local = new DateTimeZone(date_default_timezone_get());
+    $signed = static fn (float $value): string => ($value > 0 ? '+' : ($value < 0 ? '−' : '')) . '$' . number_format(abs($value), 2);
+    $percent = static fn (?float $value): string => $value === null ? '' : ($value > 0 ? '+' : ($value < 0 ? '−' : '')) . number_format(abs($value), 1) . '%';
+    ?>
+    <?php if ($itemNames === []): ?>
+        <p class="panel empty"><span data-i18n>Your items will appear here after your first purchase.</span> <a href="/checkout" data-i18n>Start shopping</a></p>
+    <?php else: ?>
+        <!-- Two ways to find an item: pick it from the list, or type part of its name. -->
+        <div class="panel toolbar report-filters price-finder">
+            <form method="get" action="/account">
+                <input type="hidden" name="tab" value="prices">
+                <label><span data-i18n>Item</span>
+                    <!-- Picking an item shows its history right away; the button is for keyboards without JavaScript. -->
+                    <select id="item-choice" name="item" onchange="this.form.submit()">
+                        <option value="" data-i18n>Choose an item you bought</option>
+                        <?php foreach ($itemNames as $name): ?>
+                            <option value="<?= $e($name) ?>" <?= $itemChoice === $name ? 'selected' : '' ?>><?= $e($name) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <button class="button" type="submit"><span data-i18n>Show</span></button>
+            </form>
+            <span class="price-finder-or" data-i18n>or</span>
+            <form method="get" action="/account" role="search">
+                <input type="hidden" name="tab" value="prices">
+                <label for="item-search"><span data-i18n>Search</span></label>
+                <!-- As the customer types, item-search.js shows every item whose name contains the text; clicking one opens its history. -->
+                <div class="item-search-box">
+                    <input id="item-search" name="q" type="search" value="<?= $e($itemSearch) ?>" maxlength="50" autocomplete="off"
+                        role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="item-suggestions"
+                        placeholder="For example: milk" data-i18n-placeholder="For example: milk">
+                    <ul id="item-suggestions" class="item-suggestions" role="listbox" hidden>
+                        <?php foreach ($itemNames as $i => $name): ?>
+                            <li id="item-suggestion-<?= $i ?>" role="option" aria-selected="false">
+                                <a href="/account?<?= $e(http_build_query(['tab' => 'prices', 'item' => $name])) ?>" tabindex="-1"><?= $e($name) ?></a>
+                            </li>
+                        <?php endforeach; ?>
+                        <li class="item-suggestions-none" hidden><span data-i18n>No item you bought matches this.</span></li>
+                    </ul>
+                </div>
+                <button class="button primary" type="submit"><span data-i18n>Search</span></button>
+            </form>
+        </div>
+        <script src="/assets/js/item-search.js" defer></script>
+    <?php endif; ?>
+
+    <?php if ($itemError !== null): ?>
+        <p class="empty field-error" role="alert"><span data-i18n><?= $e($itemError) ?></span></p>
+    <?php elseif ($itemNames !== [] && $itemSearch === '' && $itemChoice === ''): ?>
+        <p class="panel empty"><span data-i18n>Choose an item or search part of its name to see how many times you bought it and how its price changed.</span></p>
+    <?php elseif ($itemNames !== [] && $itemResults === []): ?>
+        <p class="panel empty"><span data-i18n>You have not bought any item matching this search.</span> <span data-i18n>Try part of the name, for example "kit" for KitKat.</span></p>
+    <?php endif; ?>
+
+    <?php foreach ($itemResults as $index => $item): ?>
+        <?php
+        $labels = [];
+        $titles = [];
+        foreach ($item['purchases'] as $purchase) {
+            $when = (new DateTimeImmutable($purchase['purchased_at']))->setTimezone($local);
+            $labels[] = $when->format('M j');
+            $titles[] = $when->format('M j, Y · H:i');
+        }
+        ?>
+        <section class="section-gap price-item" aria-labelledby="item-<?= $index ?>">
+            <h2 id="item-<?= $index ?>" class="price-item-name"><?= $e($item['name']) ?></h2>
+            <dl class="stats four">
+                <div><dt><span data-i18n>Times purchased</span></dt><dd><?= number_format($item['times']) ?></dd></div>
+                <div><dt><span data-i18n>Units bought</span></dt><dd><?= number_format($item['units']) ?></dd></div>
+                <div><dt><span data-i18n>Price now</span></dt><dd><?= $money($item['last_price']) ?></dd></div>
+                <div><dt><span data-i18n>Change since first purchase</span></dt>
+                    <dd><?= $item['times'] > 1 ? $e($percent($item['change_percent']) ?: '0.0%') : '—' ?></dd>
+                    <?php if ($item['times'] > 1): ?><span class="subtext"><?= $money($item['first_price']) ?> → <?= $money($item['last_price']) ?></span><?php endif; ?></div>
+            </dl>
+            <div class="panel section-gap">
+                <div class="section-heading">
+                    <h3><span data-i18n>Price at each purchase</span></h3>
+                </div>
+                <div class="chart-box">
+                    <canvas class="price-chart" role="img"
+                        aria-label="<?= $e('Price of ' . $item['name'] . ' at each purchase, from ' . $money($item['first_price']) . ' to ' . $money($item['last_price'])) ?>"
+                        data-labels="<?= $e(json_encode($labels)) ?>"
+                        data-titles="<?= $e(json_encode($titles)) ?>"
+                        data-prices="<?= $e(json_encode(array_column($item['purchases'], 'unit_price'))) ?>"></canvas>
+                </div>
+                <div class="table-scroll compact">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col" data-i18n>Date and time</th>
+                                <th scope="col" class="numeric" data-i18n>Unit price</th>
+                                <th scope="col" class="numeric" data-i18n>Quantity</th>
+                                <th scope="col" class="numeric" data-i18n>Change since previous purchase</th>
+                                <th scope="col" data-i18n>Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($item['purchases'] as $i => $purchase): ?>
+                                <tr>
+                                    <td><?= $e($titles[$i]) ?></td>
+                                    <td class="numeric"><?= $money($purchase['unit_price']) ?></td>
+                                    <td class="numeric"><?= $purchase['quantity'] ?></td>
+                                    <td class="numeric">
+                                        <?php if ($purchase['change'] === null): ?>
+                                            <span class="hint" data-i18n>First purchase</span>
+                                        <?php elseif ($purchase['change'] == 0): ?>
+                                            <span class="hint" data-i18n>No change</span>
+                                        <?php else: ?>
+                                            <?= $e($signed($purchase['change']) . ' (' . $percent($purchase['change_percent']) . ')') ?>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><a href="/receipt?id=<?= $purchase['purchase_id'] ?>" data-i18n>View receipt</a></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    <?php endforeach; ?>
+    <?php if ($itemResults !== []): ?>
+        <script src="/assets/js/vendor/chart.umd.min.js" defer></script>
+        <script src="/assets/js/price-chart.js" defer></script>
+    <?php endif; ?>
+
 <?php else: ?>
     <?php
     // "Nov 20, 2026" for one day, "Oct 27 – Nov 25, 2026" for a range.
