@@ -52,6 +52,43 @@ class PurchaseHistoryModel
         }, $rows);
     }
 
+    /**
+     * Total spent and a spending series for one period (P4-18), computed from the receipts()
+     * of that period, so the totals always match the receipts listed on the page.
+     * Up to 62 days: one point per day; longer: one per month. Periods without purchases are 0.
+     */
+    public function spending(array $receipts, DateTimeImmutable $from, DateTimeImmutable $to): array
+    {
+        $byMonth = $from->diff($to)->days > 62;
+        $key = $byMonth ? 'Y-m' : 'Y-m-d';
+
+        $series = [];
+        $start = $byMonth ? $from->modify('first day of this month') : $from;
+        for ($period = $start; $period <= $to; $period = $period->modify($byMonth ? '+1 month' : '+1 day')) {
+            $series[$period->format($key)] = 0.0;
+        }
+
+        $local = new DateTimeZone(date_default_timezone_get());
+        foreach ($receipts as $receipt) {
+            $period = (new DateTimeImmutable($receipt['purchased_at']))->setTimezone($local)->format($key);
+            if (isset($series[$period])) {
+                $series[$period] = round($series[$period] + $receipt['total'], 2);
+            }
+        }
+
+        $total = round(array_sum(array_column($receipts, 'total')), 2);
+        $count = count($receipts);
+
+        return [
+            'total' => $total,                     // amount paid, after any points discount
+            'count' => $count,
+            'average' => $count > 0 ? round($total / $count, 2) : 0.0,
+            'points_earned' => (int) array_sum(array_column($receipts, 'points_earned')),
+            'by' => $byMonth ? 'month' : 'day',
+            'series' => $series,                   // "2026-11-20" (or "2026-11") => amount
+        ];
+    }
+
     /** Midnight of a Montreal store day, as a UTC timestamp Supabase can compare: 2026-11-20T05:00:00Z. */
     private function utc(DateTimeImmutable $day): string
     {

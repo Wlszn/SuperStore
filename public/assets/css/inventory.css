@@ -527,3 +527,5 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
 .receipt-card-totals dt { color: var(--muted); }
 .receipt-card-totals dd { margin: 0; text-align: right; }
 .receipt-card-totals .total dt, .receipt-card-totals .total dd { color: var(--text); font-weight: 700; }
+/* Spending graph on the account page (P4-18) */
+.chart-box { position: relative; height: 260px; padding: 4px 16px 16px; }
