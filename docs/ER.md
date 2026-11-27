@@ -10,7 +10,7 @@ Editable source: [`SuperStore-ERD.drawio`](SuperStore-ERD.drawio) (open it at ap
 |---|---|---|
 | `customers` | One account (customer or admin), with membership number and points | Login, self-checkout |
 | `categories` | One category the product form offers | Management |
-| `products` | One product type, identified by its barcode ("KitKat 4 Finger 45g") | Management, self-checkout |
+| `products` | One product type, identified by its barcode ("KitKat 4 Finger 45g"), including its last restocked date | Management, self-checkout |
 | `items` | One physical item = one RFID tag; sold when `purchase_id` is set | Management, self-checkout |
 | `receptions` | One delivery of a product (how many tagged items, and the date) | Management |
 | `purchases` | One checkout, which is one receipt | Self-checkout |
@@ -111,7 +111,7 @@ customers 1 ──< purchases 1 ──< purchase_items >── 1 products
 
 A product is a **type**: the barcode identifies it, and it holds the name, category, price and producer. Each physical item of that type has its own RFID tag and is one row of `items`:
 
-- **Receiving stock** (`receive_items()` in `config/checkout.sql`) creates one reception and one item per new tag, in one transaction. A tag that is already registered is refused.
+- **Receiving stock** (`receive_items()` in `config/checkout.sql`) creates one reception and one item per new tag, updates the product's `last_restocked` date, all in one transaction. A tag that is already registered is refused.
 - **Checkout** (`complete_checkout()`) takes the list of tags the reader saw. It checks that every tag is an item in stock, writes one receipt line per type (`KitKat 4 Finger 45g × 5`), and sets `purchase_id` on those items, in one transaction.
 - **Stock** (`product_stock`) is the number of items of the type with `purchase_id IS NULL`, so it is never stored and can't drift.
 

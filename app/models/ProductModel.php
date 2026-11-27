@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Services\SupaClient;
+use RuntimeException;
 
 /**
  * A product TYPE, identified by its barcode (e.g. "KitKat 4 Finger 45g", producer Nestle).
@@ -14,6 +15,7 @@ class ProductModel
     private const TABLE = 'products';
     private const STOCK_VIEW = 'product_stock';
     private const COLUMNS = 'id,name,category,price,upc,producer,image_url,in_stock';
+    private const COLUMNS_WITH_RESTOCKED = self::COLUMNS . ',last_restocked';
 
     private const MAX_PRICE = 99999999.99; // NUMERIC(10,2)
 
@@ -23,8 +25,7 @@ class ProductModel
     /** All products with their current stock, for the inventory dashboard. */
     public function all(): array
     {
-        $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
-            'select' => self::COLUMNS,
+        $rows = $this->stockRows([
             'order' => 'name.asc',
         ]);
 
@@ -34,8 +35,7 @@ class ProductModel
     /** One product by id, or null if it doesn't exist. */
     public function find(int $id): ?array
     {
-        $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
-            'select' => self::COLUMNS,
+        $rows = $this->stockRows([
             'id' => 'eq.' . $id,
             'limit' => 1,
         ]);
@@ -58,8 +58,8 @@ class ProductModel
         if ($code === '' || strlen($code) > 13 || preg_match('/[\x00-\x1F\x7F]/', $code)) {
             return null;
         }
-        $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
-            'select' => self::COLUMNS, 'upc' => 'eq.' . $code, 'limit' => 1,
+        $rows = $this->stockRows([
+            'upc' => 'eq.' . $code, 'limit' => 1,
         ]);
         if (!$rows && ctype_digit($code)) {
             $alternateUpc = strlen($code) === 12 ? self::normalizeUpc($code) : '';
@@ -67,8 +67,7 @@ class ProductModel
                 $alternateUpc = substr($code, 1);
             }
             if ($alternateUpc !== '') {
-                $rows = SupaClient::rows('GET', self::STOCK_VIEW, [
-                    'select' => self::COLUMNS,
+                $rows = $this->stockRows([
                     'upc' => 'eq.' . $alternateUpc,
                     'limit' => 1,
                 ]);
@@ -196,6 +195,19 @@ class ProductModel
         }
 
         return (10 - $sum % 10) % 10 === (int) $ean13[12];
+    }
+
+    private function stockRows(array $query): array
+    {
+        try {
+            return SupaClient::rows('GET', self::STOCK_VIEW, [
+                'select' => self::COLUMNS_WITH_RESTOCKED,
+            ] + $query);
+        } catch (RuntimeException $e) {
+            return SupaClient::rows('GET', self::STOCK_VIEW, [
+                'select' => self::COLUMNS,
+            ] + $query);
+        }
     }
 
     /** Make sure every value has a predictable PHP type. */

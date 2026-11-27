@@ -16,6 +16,7 @@ $barcode = App\Services\Barcode::code128($upc);
 
 <dl class="stats details">
     <div><dt><span data-i18n>In stock</span></dt><dd><?= number_format($product['in_stock']) ?></dd></div>
+    <div><dt><span data-i18n>Last restocked</span></dt><dd><?= empty($product['last_restocked']) ? '—' : $e(date('M j, Y', strtotime($product['last_restocked']))) ?></dd></div>
     <div><dt><span data-i18n>Unit price</span></dt><dd><?= $money($product['price']) ?></dd></div>
     <div><dt><span data-i18n>Barcode (UPC)</span></dt><dd class="code"><?= $e($product['upc'] ?? '—') ?></dd></div>
     <div><dt><span data-i18n>Category</span></dt><dd class="code"><span data-i18n><?= $e($product['category']) ?></span></dd></div>

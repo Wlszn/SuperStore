@@ -38,7 +38,7 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
     </form>
     <div class="table-scroll" tabindex="0" role="region" aria-label="Product inventory" data-i18n-aria-label="Product inventory">
         <table>
-            <thead><tr><th scope="col"><span data-i18n>Product</span></th><th scope="col"><span data-i18n>Category</span></th><th scope="col"><span data-i18n>Barcode</span></th><th scope="col" class="numeric"><span data-i18n>Price</span></th><th scope="col" class="numeric"><span data-i18n>In stock</span></th><th scope="col"><span data-i18n>Status</span></th><th scope="col"><span data-i18n>Actions</span></th></tr></thead>
+            <thead><tr><th scope="col"><span data-i18n>Product</span></th><th scope="col"><span data-i18n>Category</span></th><th scope="col"><span data-i18n>Barcode</span></th><th scope="col" class="numeric"><span data-i18n>Price</span></th><th scope="col" class="numeric"><span data-i18n>In stock</span></th><th scope="col"><span data-i18n>Status</span></th><th scope="col"><span data-i18n>Last restocked</span></th><th scope="col"><span data-i18n>Actions</span></th></tr></thead>
             <tbody>
             <?php foreach ($products as $product): ?>
                 <?php $stock = $product['in_stock']; $id = $product['id']; ?>
@@ -52,6 +52,7 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
                     <td class="numeric"><?= $money($product['price']) ?></td>
                     <td class="numeric" data-stock-count><?= number_format($stock) ?></td>
                     <td><span data-stock-status data-i18n class="stock <?= $stock <= 0 ? 'out' : ($stock <= $lowStock ? 'low' : 'available') ?>"><?= $stock <= 0 ? 'Out of stock' : ($stock <= $lowStock ? 'Low stock' : 'In stock') ?></span></td>
+                    <td><time data-restocked<?= empty($product['last_restocked']) ? '' : ' datetime="' . $e($product['last_restocked']) . '"' ?>><?= empty($product['last_restocked']) ? '—' : $e(date('M j, Y', strtotime($product['last_restocked']))) ?></time></td>
                     <td><div class="row-actions"><a href="/products/edit?id=<?= $id ?>"><span data-i18n>Edit</span></a><a href="/products/receive?id=<?= $id ?>"><span data-i18n>Receive</span></a></div></td>
                 </tr>
             <?php endforeach; ?>

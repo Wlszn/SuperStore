@@ -120,6 +120,10 @@
         const lowStock = Number(inventory.dataset.lowStock);
         const liveStatus = document.getElementById('inventory-live-status');
         const numberFormat = new Intl.NumberFormat(document.documentElement.lang || 'en');
+        const dateFormat = new Intl.DateTimeFormat(document.documentElement.lang || 'en', {
+            dateStyle: 'medium',
+            timeZone: 'UTC',
+        });
         let inventoryRequest;
         let refreshFailed = false;
 
@@ -151,6 +155,15 @@
                     if (isLow) restock++;
                     row.dataset.low = String(isLow);
                     row.querySelector('[data-stock-count]').textContent = numberFormat.format(stock);
+
+                    const restocked = row.querySelector('[data-restocked]');
+                    if (product.last_restocked) {
+                        restocked.dateTime = product.last_restocked;
+                        restocked.textContent = dateFormat.format(new Date(product.last_restocked + 'T00:00:00Z'));
+                    } else {
+                        restocked.removeAttribute('datetime');
+                        restocked.textContent = '—';
+                    }
 
                     const status = row.querySelector('[data-stock-status]');
                     const label = stock <= 0 ? 'Out of stock' : (isLow ? 'Low stock' : 'In stock');
