@@ -11,7 +11,7 @@ values in separate packets (temperature/humidity, light, motion), so the script 
 the last known value of each and sends them together whenever a new packet arrives.
 
 Settings are read from the .env file in the project root:
-    BLE_SENSOR_MAC=C3:00:45:5D:A5:12   the sensor's MAC address (all 6 pairs)
+    BLE_SENSOR_MAC=C3:00:00:45:5D:A5:12   the sensor's MAC address (all 6 pairs)
     BLE_ID_TYPE=3                      3 = random address (starts with C0 to FF), 2 = public
 """
 import json
