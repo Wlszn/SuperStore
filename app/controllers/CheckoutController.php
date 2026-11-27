@@ -241,12 +241,15 @@ class CheckoutController
             $from = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
             $to = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
             $receipts = [];
+            $spending = null;
             $historyError = null;
             if ($from === null || $to === null || $from > $to) {
                 $historyError = 'Choose a valid date range (\'from\' must be before \'to\').';
             } else {
                 // The session's customer id: customers only ever see their own receipts.
-                $receipts = (new PurchaseHistoryModel())->receipts((int) $_SESSION['customer_id'], $from, $to);
+                $history = new PurchaseHistoryModel();
+                $receipts = $history->receipts((int) $_SESSION['customer_id'], $from, $to);
+                $spending = $history->spending($receipts, $from, $to); // P4-18: total spent + graph
             }
             require APP_ROOT . '/app/views/account.php';
         } catch (RuntimeException $error) {

@@ -84,6 +84,41 @@ require __DIR__ . '/products/_start.php';
         <button type="submit" class="button primary"><span data-i18n>Show receipts</span></button>
     </form>
 
+    <?php if ($spending !== null): ?>
+        <!-- P4-18: total spent in the period, from the same receipts as the list below -->
+        <dl class="stats four section-gap" aria-label="Spending summary" data-i18n-aria-label="Spending summary">
+            <div><dt><span data-i18n>Total spent</span></dt><dd><?= $money($spending['total']) ?></dd></div>
+            <div><dt><span data-i18n>Receipts</span></dt><dd><?= number_format($spending['count']) ?></dd></div>
+            <div><dt><span data-i18n>Average per receipt</span></dt><dd><?= $money($spending['average']) ?></dd></div>
+            <div><dt><span data-i18n>Points earned</span></dt><dd><?= number_format($spending['points_earned']) ?></dd></div>
+        </dl>
+        <?php if ($spending['count'] > 0): ?>
+            <?php
+            // Labels are made here, in Montreal time, so the browser never shifts a day.
+            $labels = [];
+            foreach (array_keys($spending['series']) as $day) {
+                $labels[] = $spending['by'] === 'month'
+                    ? DateTimeImmutable::createFromFormat('!Y-m', $day)->format('M Y')
+                    : DateTimeImmutable::createFromFormat('!Y-m-d', $day)->format('M j');
+            }
+            ?>
+            <section class="panel section-gap" aria-labelledby="spending-heading">
+                <div class="section-heading">
+                    <h2 id="spending-heading"><span data-i18n>Spending over time</span></h2>
+                    <p class="hint"><span data-i18n><?= $spending['by'] === 'month' ? 'Amount paid per month' : 'Amount paid per day' ?></span></p>
+                </div>
+                <div class="chart-box">
+                    <canvas id="spending-chart" role="img"
+                        aria-label="<?= $e('Spending over time: ' . $money($spending['total']) . ' in ' . $spending['count'] . ' receipts, ' . $period) ?>"
+                        data-labels="<?= $e(json_encode($labels)) ?>"
+                        data-amounts="<?= $e(json_encode(array_values($spending['series']))) ?>"></canvas>
+                </div>
+            </section>
+            <script src="/assets/js/vendor/chart.umd.min.js" defer></script>
+            <script src="/assets/js/spending-chart.js" defer></script>
+        <?php endif; ?>
+    <?php endif; ?>
+
     <section class="section-gap" aria-labelledby="history-heading">
         <div class="section-heading">
             <h2 id="history-heading"><span data-i18n>Receipt history</span></h2>
