@@ -60,3 +60,28 @@ Self-checkout is RFID only: the page listens to `/api/scans/latest`, looks every
 | `GET /api/readings/latest` | Latest reading per fridge and the fan state. |
 | `GET /api/fan`, `POST /api/fan` | Read or set `{"on": true}`. |
 | `GET /api/thresholds` | Every fridge with its maximum temperature. |
+
+## BLE sensor (Minew MSP01)
+
+| Route | Description |
+|---|---|
+| `POST /api/ble-readings` | `{"mac": "c300455da512", "temp": 22.4, "hum": 41.0, "lux": 310, "motion": true, "battery": 95}`, sent by `ble.py`. Only `mac` is required; a value the sensor has not sent yet is `null`. |
+| `GET /api/ble-readings/latest` | The newest reading. Add `?mac=` to choose a sensor. |
+
+```json
+{
+  "status": "success",
+  "reading": {
+    "id": 42,
+    "mac": "c30000455da512",
+    "temperature": 22.4,
+    "humidity": 41.0,
+    "illuminance": 310.0,
+    "motion": true,
+    "battery": 95,
+    "recorded_at": "2026-11-27T14:30:12+00:00"
+  }
+}
+```
+
+`reading` is `null` until the sensor has sent something, and any single value can be `null`. Units: °C, % relative humidity, lux, battery %.

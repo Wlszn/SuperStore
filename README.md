@@ -96,7 +96,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ### 2. Database
 
-For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql` and `config/reports.sql`, in that order. All three are safe to run again on an existing database. Give your account admin access:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql` and `config/reports.sql`, `config/ble.sql` in that order. All three are safe to run again on an existing database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -114,6 +114,7 @@ In separate terminals:
 ```bash
 python3 scripts/monitor.py   # fridge readings and email alerts
 python3 scripts/fan.py       # fan motor
+python3 scripts/ble.py
 ```
 
 Allow the ESP32 boards to reach the broker (`/etc/mosquitto/conf.d/superstore.conf`), then restart Mosquitto:
@@ -145,7 +146,7 @@ See the [demonstration guide](docs/Demonstration.md) for the delivery, scan, pay
 | Products (admin) | `GET /products`, `/products/create`, `/products/edit`, `/products/show`, `/products/receive` |
 | Product actions (admin) | `POST /products`, `/products/update`, `/products/delete`, `/receptions` |
 | Scanners | `GET /api/products/lookup?code=` (barcode), `GET /api/items/lookup?epcs=` (RFID tags), `POST /api/scans`, `GET /api/scans/latest` |
-
+| BLE sensor | POST /api/ble-readings, GET /api/ble-readings latest |
 Request and response formats: [`docs/API.md`](docs/API.md).
 
 ## Database
