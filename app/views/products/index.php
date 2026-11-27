@@ -5,22 +5,72 @@ $section = 'products';
 require __DIR__ . '/_start.php';
 
 $units = array_sum(array_column($products, 'in_stock'));
-$restock = count(array_filter($products, static fn ($product) => $product['in_stock'] <= $lowStock));
+$availableProducts = count(array_filter($products, static fn ($product) => $product['in_stock'] > $lowStock));
+$lowStockProducts = count(array_filter($products, static fn ($product) => $product['in_stock'] > 0 && $product['in_stock'] <= $lowStock));
+$outOfStockProducts = count(array_filter($products, static fn ($product) => $product['in_stock'] === 0));
+$maxProductStock = $products === [] ? 1 : max(1, max(array_column($products, 'in_stock')));
+$chartProducts = $products;
+usort($chartProducts, static fn ($a, $b) => $b['in_stock'] <=> $a['in_stock'] ?: strcasecmp($a['name'], $b['name']));
 
 ?>
 <header class="page-heading">
     <div><h1><span data-i18n>Products</span></h1><p><span data-i18n>Manage your catalog and track what’s in stock.</span></p></div>
     <div class="row-actions">
         <a class="button" href="/products/export"><span data-i18n>Export CSV</span></a>
+        <button class="button" type="button" data-download-pdf><span data-i18n>Download PDF</span></button>
         <a class="button primary" href="/products/create"><span data-i18n>＋ Add product</span></a>
     </div>
 </header>
 
-<dl class="stats">
-    <div><dt><span data-i18n>Products</span></dt><dd><?= number_format(count($products)) ?></dd></div>
-    <div><dt><span data-i18n>Units in stock</span></dt><dd id="units-in-stock"><?= number_format($units) ?></dd></div>
-    <div><dt><span data-i18n>Need restocking</span></dt><dd id="products-needing-restock"><?= number_format($restock) ?></dd></div>
-</dl>
+<section class="panel inventory-report" aria-labelledby="inventory-report-title">
+    <div class="print-report-meta">
+        <strong>SuperStore</strong>
+        <span><span data-i18n>Generated on</span> <?= $e(date('M j, Y g:i A')) ?></span>
+    </div>
+    <div class="section-heading"><h2 id="inventory-report-title"><span data-i18n>Inventory report</span></h2></div>
+    <dl class="stats four">
+        <div><dt><span data-i18n>Total products</span></dt><dd id="report-product-count"><?= number_format(count($products)) ?></dd></div>
+        <div><dt><span data-i18n>Total units in stock</span></dt><dd id="report-units-in-stock"><?= number_format($units) ?></dd></div>
+        <div><dt><span data-i18n>Low-stock products</span></dt><dd id="report-low-stock"><?= number_format($lowStockProducts) ?></dd></div>
+        <div><dt><span data-i18n>Out-of-stock products</span></dt><dd id="report-out-of-stock"><?= number_format($outOfStockProducts) ?></dd></div>
+    </dl>
+    <div class="ranking inventory-charts">
+        <section class="panel ranking-list" aria-label="Products by stock status" data-i18n-aria-label="Products by stock status">
+            <h2><span data-i18n>Products by stock status</span></h2>
+            <div class="inventory-pie-layout">
+                <svg id="product-stock-pie" class="product-stock-pie" viewBox="0 0 100 100" role="img" aria-label="Products by stock status" data-i18n-aria-label="Products by stock status"
+                    data-available="<?= $availableProducts ?>" data-low="<?= $lowStockProducts ?>" data-out="<?= $outOfStockProducts ?>">
+                    <title data-i18n>Products by stock status</title>
+                    <path data-pie-slice="available" class="pie-available"></path>
+                    <path data-pie-slice="low" class="pie-low"></path>
+                    <path data-pie-slice="out" class="pie-out"></path>
+                </svg>
+                <ul class="product-stock-legend">
+                    <li><span><i class="legend-dot available"></i><span data-i18n>In stock</span></span><strong id="report-available-count"><?= number_format($availableProducts) ?></strong></li>
+                    <li><span><i class="legend-dot low"></i><span data-i18n>Low stock</span></span><strong id="report-low-count"><?= number_format($lowStockProducts) ?></strong></li>
+                    <li><span><i class="legend-dot out"></i><span data-i18n>Out of stock</span></span><strong id="report-out-count"><?= number_format($outOfStockProducts) ?></strong></li>
+                </ul>
+            </div>
+        </section>
+        <section class="panel ranking-list" aria-label="Units in stock by product" data-i18n-aria-label="Units in stock by product">
+            <h2><span data-i18n>Units in stock by product</span></h2>
+            <?php if ($chartProducts === []): ?>
+                <p class="empty"><span data-i18n>No products yet.</span></p>
+            <?php else: ?>
+                <ol class="product-stock-chart">
+                    <?php foreach ($chartProducts as $product): ?>
+                        <?php $stock = $product['in_stock']; ?>
+                        <li data-chart-product-id="<?= $product['id'] ?>">
+                            <span class="chart-product-name"><?= $e($product['name']) ?></span>
+                            <span class="product-stock-track"><span data-product-stock-bar class="product-stock-bar" style="width: <?= number_format($stock / $maxProductStock * 100, 2, '.', '') ?>%"></span></span>
+                            <strong data-product-stock-value><?= number_format($stock) ?></strong>
+                        </li>
+                    <?php endforeach; ?>
+                </ol>
+            <?php endif; ?>
+        </section>
+    </div>
+</section>
 
 <section class="panel" aria-label="Product catalog" data-i18n-aria-label="Product catalog"
     data-inventory-url="/api/products/stock" data-low-stock="<?= (int) $lowStock ?>">
@@ -67,4 +117,5 @@ $restock = count(array_filter($products, static fn ($product) => $product['in_st
     <div class="table-footer" id="inventory-live-status" role="status" aria-live="polite" data-i18n>Live inventory updates every 5 seconds.</div>
     <div class="table-footer" id="product-count" aria-live="polite" data-i18n><?= count($products) ?> <?= count($products) === 1 ? 'product' : 'products' ?></div>
 </section>
+
 <?php require __DIR__ . '/_end.php'; ?>
