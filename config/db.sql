@@ -73,6 +73,7 @@ CREATE TABLE products (
   upc         VARCHAR(13)   UNIQUE,          -- barcode of the type
   producer    VARCHAR(100)  NOT NULL,
   image_url   TEXT,
+  last_restocked DATE,
   created_at  TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
 
@@ -148,11 +149,16 @@ INSERT INTO products (name, category, price, upc, producer) VALUES
 INSERT INTO receptions (product_id, quantity, received_at) VALUES
   (1, 2, CURRENT_DATE - 7), (2, 3, CURRENT_DATE), (3, 1, CURRENT_DATE);
 
+UPDATE products p
+SET last_restocked = latest.received_at
+FROM (
+  SELECT product_id, MAX(received_at) AS received_at
+  FROM receptions
+  GROUP BY product_id
+) latest
+WHERE latest.product_id = p.id;
+
 INSERT INTO items (epc, product_id, reception_id) VALUES
   ('E28011700000020A1B2C3D01', 1, 1), ('E28011700000020A1B2C3D02', 1, 1),
   ('E28011700000020A1B2C3D03', 2, 2), ('E28011700000020A1B2C3D04', 2, 2), ('E28011700000020A1B2C3D05', 2, 2),
   ('E28011700000020A1B2C3D06', 3, 3);
-
-
-//added a new restock row 
-  Alter table products add last_restocked Date null;

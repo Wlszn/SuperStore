@@ -99,7 +99,7 @@ class ProductController
 
         $out = fopen('php://output', 'w');
         fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, ['Product', 'Category', 'Barcode', 'Price', 'In stock', 'Status', 'Producer'], ',', '"', '');
+        fputcsv($out, ['Product', 'Category', 'Barcode', 'Price', 'In stock', 'Status', 'Producer', 'Last restocked'], ',', '"', '');
 
         foreach ($products as $product) {
             $stock = (int) $product['in_stock'];
@@ -111,6 +111,7 @@ class ProductController
                 $stock,
                 $stock <= 0 ? 'Out of stock' : ($stock <= ProductModel::LOW_STOCK ? 'Low stock' : 'In stock'),
                 $this->csvCell($product['producer']),
+                $product['last_restocked'] ?? '',
             ], ',', '"', '');
         }
 
