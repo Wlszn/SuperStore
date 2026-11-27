@@ -529,3 +529,21 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
 .receipt-card-totals .total dt, .receipt-card-totals .total dd { color: var(--text); font-weight: 700; }
 /* Spending graph on the account page (P4-18) */
 .chart-box { position: relative; height: 260px; padding: 4px 16px 16px; }
+/* Item price history on the account page (P4-19) */
+.report-filters input[type=search] { width: min(100%, 300px); }
+.price-finder form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.price-finder select { width: min(100%, 280px); }
+.price-finder-or { color: var(--muted); font-size: 13px; }
+.price-finder label[for=item-search] { font-size: 13px; }
+/* Label, box and Search button stay on one line; when space runs out the whole group moves down, and on a phone the box shrinks. */
+.price-finder form[role=search] { flex-wrap: nowrap; max-width: 100%; }
+.item-search-box { position: relative; flex: 0 1 240px; min-width: 0; }
+.report-filters .item-search-box input[type=search] { width: 100%; }
+.item-suggestions { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; max-height: 264px; overflow-y: auto;
+    margin: 0; padding: 4px; list-style: none; background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(29, 36, 45, 0.12); }
+.item-suggestions a { display: block; padding: 8px 10px; border-radius: 6px; color: var(--text); text-decoration: none; }
+.item-suggestions a:hover, .item-suggestions [aria-selected=true] a { background: var(--blue-wash); }
+.item-suggestions mark { background: none; color: var(--blue); font-weight: 700; }
+.item-suggestions-none { padding: 8px 10px; color: var(--muted); font-size: 13px; }
+.price-item-name { margin: 0 0 10px; font-size: 18px; }
+.price-item .section-heading h3 { margin: 0; font-size: 15px; }

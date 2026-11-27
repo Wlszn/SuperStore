@@ -251,6 +251,29 @@ class CheckoutController
                 $receipts = $history->receipts((int) $_SESSION['customer_id'], $from, $to);
                 $spending = $history->spending($receipts, $from, $to); // P4-18: total spent + graph
             }
+
+            // Price history tab (P4-19): pick an item they bought, or search part of a name.
+            // Only ever the session customer's own purchases.
+            $itemSearch = trim((string) ($_GET['q'] ?? ''));
+            $itemChoice = trim((string) ($_GET['item'] ?? ''));
+            $itemNames = [];
+            $itemResults = [];
+            $itemError = null;
+            if (($_GET['tab'] ?? '') === 'prices') {
+                $history = new PurchaseHistoryModel();
+                $customerId = (int) $_SESSION['customer_id'];
+                $itemNames = $history->itemNames($customerId);
+                if (mb_strlen($itemSearch) > 50) {
+                    $itemError = 'Search for at most 50 characters.';
+                } elseif ($itemSearch !== '') {
+                    $itemChoice = '';   // a typed search wins over the dropdown
+                    $itemResults = $history->itemHistory($customerId, $itemSearch);
+                } elseif ($itemChoice !== '' && !in_array($itemChoice, $itemNames, true)) {
+                    $itemError = 'Choose an item from the list.';
+                } elseif ($itemChoice !== '') {
+                    $itemResults = $history->itemHistory($customerId, $itemChoice, true);
+                }
+            }
             require APP_ROOT . '/app/views/account.php';
         } catch (RuntimeException $error) {
             http_response_code(503);
