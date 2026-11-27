@@ -13,6 +13,7 @@ use App\Controllers\FanApiController;
 use App\Controllers\ProductController;
 use App\Controllers\ScanApiController;
 use App\Controllers\SalesReportController;
+use App\Controllers\BleApiController;
 
 
 define('APP_ROOT', dirname(__DIR__));
@@ -99,10 +100,16 @@ $routes = [
     'POST /api/scans'          => [ScanApiController::class, 'store'],
     'GET /api/scans/latest'    => [ScanApiController::class, 'latest'],
 
-    // Phase 4: reports (admin only)
+    // Phase 4: 
+    //reports (admin only)
     'GET /api/reports/sales' => [SalesReportController::class, 'sales'],
     'GET /reports/sales' => [App\Controllers\SalesReportController::class, 'page'],
     'GET /reports/sales/export' => [SalesReportController::class, 'export'],
+
+    //MSP01 BLE sensor
+    'POST /api/ble-readings'       => [BleApiController::class, 'store'],
+    'GET /api/ble-readings/latest' => [BleApiController::class, 'latest'],
+
 ];
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
