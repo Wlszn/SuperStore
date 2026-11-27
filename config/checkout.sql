@@ -6,6 +6,15 @@ ALTER TABLE customers ALTER COLUMN membership_number TYPE varchar(64);
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS request_key text UNIQUE;
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS points_redeemed integer NOT NULL DEFAULT 0 CHECK (points_redeemed >= 0);
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS payment_method text NOT NULL DEFAULT 'card' CHECK (payment_method IN ('card', 'cash'));
+ALTER TABLE products ADD COLUMN IF NOT EXISTS last_restocked date;
+UPDATE products p
+SET last_restocked = latest.received_at
+FROM (
+  SELECT product_id, MAX(received_at) AS received_at
+  FROM receptions
+  GROUP BY product_id
+) latest
+WHERE latest.product_id = p.id AND p.last_restocked IS NULL;
 
 -- Categories: a fixed list the product form offers.
 CREATE TABLE IF NOT EXISTS categories (name varchar(50) PRIMARY KEY);
@@ -70,6 +79,9 @@ BEGIN
     RETURNING * INTO reception;
     INSERT INTO items (epc, product_id, reception_id)
     SELECT DISTINCT upper(x), p_product, reception.id FROM jsonb_array_elements_text(p_epcs) x;
+    UPDATE products
+    SET last_restocked = GREATEST(COALESCE(last_restocked, p_received), p_received)
+    WHERE id = p_product;
     RETURN to_jsonb(reception);
 END $$;
 
@@ -144,3 +156,4 @@ GRANT EXECUTE ON FUNCTION complete_checkout(text, integer, jsonb, integer) TO se
 REVOKE ALL ON FUNCTION receive_items(integer, date, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION receive_items(integer, date, jsonb) TO service_role;
 COMMIT;
+NOTIFY pgrst, 'reload schema';

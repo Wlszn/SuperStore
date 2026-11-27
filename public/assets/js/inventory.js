@@ -117,9 +117,44 @@
 
     const inventory = document.querySelector('[data-inventory-url]');
     if (inventory) {
+        document.querySelector('[data-download-pdf]')?.addEventListener('click', () => window.print());
+
         const lowStock = Number(inventory.dataset.lowStock);
         const liveStatus = document.getElementById('inventory-live-status');
         const numberFormat = new Intl.NumberFormat(document.documentElement.lang || 'en');
+        const dateFormat = new Intl.DateTimeFormat(document.documentElement.lang || 'en', {
+            dateStyle: 'medium',
+            timeZone: 'UTC',
+        });
+        const pie = document.getElementById('product-stock-pie');
+        const pieSegments = [
+            {key: 'available', countId: 'report-available-count'},
+            {key: 'low', countId: 'report-low-count'},
+            {key: 'out', countId: 'report-out-count'},
+        ];
+        function pieSlicePath(startAngle, value, total) {
+            if (value <= 0 || total <= 0) return '';
+            if (value === total) return 'M 50 50 L 50 0 A 50 50 0 1 1 50 100 A 50 50 0 1 1 50 0 Z';
+
+            const endAngle = startAngle + value / total * 360;
+            const start = [50 + 50 * Math.cos(startAngle * Math.PI / 180), 50 + 50 * Math.sin(startAngle * Math.PI / 180)];
+            const end = [50 + 50 * Math.cos(endAngle * Math.PI / 180), 50 + 50 * Math.sin(endAngle * Math.PI / 180)];
+            const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+            return `M 50 50 L ${start[0]} ${start[1]} A 50 50 0 ${largeArc} 1 ${end[0]} ${end[1]} Z`;
+        }
+        function updatePieChart(available, low, out) {
+            const values = {available, low, out};
+            const total = available + low + out;
+            let startAngle = -90;
+            for (const segment of pieSegments) {
+                const value = values[segment.key];
+                pie.querySelector(`[data-pie-slice="${segment.key}"]`)
+                    .setAttribute('d', pieSlicePath(startAngle, value, total));
+                document.getElementById(segment.countId).textContent = numberFormat.format(value);
+                startAngle += total > 0 ? value / total * 360 : 0;
+            }
+        }
+        updatePieChart(Number(pie.dataset.available), Number(pie.dataset.low), Number(pie.dataset.out));
         let inventoryRequest;
         let refreshFailed = false;
 
@@ -139,18 +174,41 @@
                 }
 
                 const currentRows = new Map(rows.map(row => [Number(row.dataset.productId), row]));
+                const chartRows = new Map([...document.querySelectorAll('[data-chart-product-id]')]
+                    .map(row => [Number(row.dataset.chartProductId), row]));
+                const stockByProduct = new Map();
                 let units = 0;
-                let restock = 0;
+                let availableProducts = 0;
+                let lowStockProducts = 0;
+                let outOfStockProducts = 0;
                 for (const product of result.products) {
                     const stock = Number(product.in_stock);
-                    const row = currentRows.get(Number(product.id));
+                    const productId = Number(product.id);
+                    const row = currentRows.get(productId);
                     if (!Number.isInteger(stock) || stock < 0 || !row) continue;
 
+                    stockByProduct.set(productId, stock);
                     units += stock;
                     const isLow = stock <= lowStock;
-                    if (isLow) restock++;
+                    const isOut = stock === 0;
+                    if (isOut) {
+                        outOfStockProducts++;
+                    } else if (isLow) {
+                        lowStockProducts++;
+                    } else {
+                        availableProducts++;
+                    }
                     row.dataset.low = String(isLow);
                     row.querySelector('[data-stock-count]').textContent = numberFormat.format(stock);
+
+                    const restocked = row.querySelector('[data-restocked]');
+                    if (product.last_restocked) {
+                        restocked.dateTime = product.last_restocked;
+                        restocked.textContent = dateFormat.format(new Date(product.last_restocked + 'T00:00:00Z'));
+                    } else {
+                        restocked.removeAttribute('datetime');
+                        restocked.textContent = '—';
+                    }
 
                     const status = row.querySelector('[data-stock-status]');
                     const label = stock <= 0 ? 'Out of stock' : (isLow ? 'Low stock' : 'In stock');
@@ -159,8 +217,17 @@
                     window.setLocalizedText(status, label);
                 }
 
-                document.getElementById('units-in-stock').textContent = numberFormat.format(units);
-                document.getElementById('products-needing-restock').textContent = numberFormat.format(restock);
+                const maxStock = Math.max(1, ...stockByProduct.values());
+                for (const [productId, chartRow] of chartRows) {
+                    const stock = stockByProduct.get(productId) ?? 0;
+                    chartRow.querySelector('[data-product-stock-bar]').style.width = `${stock / maxStock * 100}%`;
+                    chartRow.querySelector('[data-product-stock-value]').textContent = numberFormat.format(stock);
+                }
+
+                document.getElementById('report-units-in-stock').textContent = numberFormat.format(units);
+                document.getElementById('report-low-stock').textContent = numberFormat.format(lowStockProducts);
+                document.getElementById('report-out-of-stock').textContent = numberFormat.format(outOfStockProducts);
+                updatePieChart(availableProducts, lowStockProducts, outOfStockProducts);
                 filterProducts();
                 if (refreshFailed) {
                     window.setLocalizedText(liveStatus, 'Live inventory updates every 5 seconds.');
