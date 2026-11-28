@@ -399,19 +399,6 @@ label[for="member-barcode"] { display: block; margin-bottom: 12px; font-weight: 
 .checkout-summary { margin: 0; padding-left: 20px; }
 
 @media screen {
-    :root[data-theme="dark"] {
-        color-scheme: dark;
-        --canvas: #111820;
-        --sidebar: #19232e;
-        --text: #e7edf4;
-        --muted: #a4b0be;
-        --line: #364351;
-        --blue: #8fc5ff;
-        --blue-hover: #b2d8ff;
-        --blue-wash: #25384d;
-        --red: #ff8992;
-    }
-
     :root[data-theme="dark"] .nav-link { color: #cbd5df; }
     :root[data-theme="dark"] .nav-link:hover { background: #26313e; }
     :root[data-theme="dark"] .button:not(.primary):not(.danger) {
@@ -795,8 +782,6 @@ input.basket-quantity { width: 5rem; font-variant-numeric: tabular-nums; }
 .price-item .subtext + .subtext { margin-top: 2px; }
 /* Light/dark switch in the top bar: shows the mode it switches to */
 .theme-switch { min-width: 36px; padding: 7px 9px; }
-.theme-switch svg { width: 16px; height: 16px; }
-:root[data-theme="dark"] .theme-switch .icon-moon, :root:not([data-theme="dark"]) .theme-switch .icon-sun { display: none; }
 
 /* My account: export buttons, and what "Download PDF" prints for Orders and Price history */
 .account-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 12px; }

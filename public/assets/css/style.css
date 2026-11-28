@@ -190,27 +190,11 @@ input.invalid { border-color: #b13c2e; }
 .auth-page input:focus { outline-color: #3774b2; }
 .auth-page input.invalid { border-color: #b13c2e; }
 
-<<<<<<< Updated upstream
-/* Light/dark switch and dark mode for the sign-in and sign-up pages. theme.js sets data-theme on <html>. */
+
+/* Light/dark switch and dark mode for authentication and dashboard pages. */
 .language-control { gap: 8px; }
 .container .theme-switch { display: inline-flex; align-items: center; justify-content: center; width: auto; min-width: 44px; padding: 6px 10px; }
-.theme-switch svg { display: block; width: 16px; height: 16px; }
-:root[data-theme="dark"] .theme-switch .icon-moon, :root:not([data-theme="dark"]) .theme-switch .icon-sun { display: none; }
-@media screen {
-    :root[data-theme="dark"] { color-scheme: dark; }
-    :root[data-theme="dark"] .auth-page { --ink: #e4e8ed; --muted: #9ba6b4; --line: #2a313a; --accent: #78a9e0; --background: #13171c; }
-    :root[data-theme="dark"] .auth-page .container { background: #181d23; }
-    :root[data-theme="dark"] .auth-page input { background: #1b2128; border-color: #36404b; }
-    :root[data-theme="dark"] .auth-page input:focus { outline-color: #78a9e0; }
-    :root[data-theme="dark"] .auth-page button { color: #0c1622; }
-    :root[data-theme="dark"] .auth-page button:hover:not(:disabled) { background: #95bce8; }
-    :root[data-theme="dark"] .auth-page .field-error,
-    :root[data-theme="dark"] .form-message.error { color: #f2959e; }
-    :root[data-theme="dark"] .auth-page input.invalid { border-color: #f2959e; }
-    :root[data-theme="dark"] .form-message.error { border-color: #63303a; }
-    :root[data-theme="dark"] .form-message.success { color: #86d3a2; border-color: #285a3d; }
-    :root[data-theme="dark"] .switch-page.guest-link { border-top-color: var(--line); }
-=======
+
 @media screen {
     :root[data-theme="dark"] {
         color-scheme: dark;
@@ -220,7 +204,13 @@ input.invalid { border-color: #b13c2e; }
         --accent: #76cbbb;
         --background: #141c1a;
     }
-
+    :root[data-theme="dark"] .auth-page {
+        --ink: #e4e8ed;
+        --muted: #9ba6b4;
+        --line: #2a313a;
+        --accent: #78a9e0;
+        --background: #13171c;
+    }
     :root[data-theme="dark"] .container,
     :root[data-theme="dark"] .site-header,
     :root[data-theme="dark"] .connection-label,
@@ -228,7 +218,8 @@ input.invalid { border-color: #b13c2e; }
         background: #202b28;
         color: var(--ink);
     }
-    :root[data-theme="dark"] .site-header { border-color: var(--line); }
+    :root[data-theme="dark"] .auth-page .container { background: #181d23; }
+    :root[data-theme="dark"] .site-header,
     :root[data-theme="dark"] .fridge-row { border-color: var(--line); }
     :root[data-theme="dark"] .connection-label { border-color: #3d7469; }
     :root[data-theme="dark"] .fridge-picture,
@@ -245,19 +236,22 @@ input.invalid { border-color: #b13c2e; }
         background: #151e1b;
         color: var(--ink);
     }
+    :root[data-theme="dark"] .auth-page input { background: #1b2128; border-color: #36404b; }
     :root[data-theme="dark"] button { border-color: #246c60; background: #246c60; color: #fff; }
     :root[data-theme="dark"] button:hover:not(:disabled) { background: #2e8273; }
+    :root[data-theme="dark"] .auth-page button:not(.theme-switch) { border-color: #78a9e0; background: #78a9e0; color: #0c1622; }
+    :root[data-theme="dark"] .auth-page button:hover:not(:disabled):not(.theme-switch) { background: #95bce8; }
     :root[data-theme="dark"] input:focus { outline-color: #6bb9a9; }
+    :root[data-theme="dark"] .auth-page input:focus { outline-color: #78a9e0; }
     :root[data-theme="dark"] input.invalid { border-color: #e7796d; }
     :root[data-theme="dark"] .field-error { color: #ff9a8f; }
     :root[data-theme="dark"] .form-message { background: #202b28; }
     :root[data-theme="dark"] .form-message.success { border-color: #39765f; color: #9de0bd; }
     :root[data-theme="dark"] .form-message.error { border-color: #8a4b43; color: #ffaaa0; }
     :root[data-theme="dark"] .switch-page.guest-link { border-color: var(--line); }
-    :root[data-theme="dark"] .container #theme-switch {
+    :root[data-theme="dark"] .container .theme-switch {
         border-color: #46564f;
         background: #202b28;
         color: var(--ink);
     }
->>>>>>> Stashed changes
 }
