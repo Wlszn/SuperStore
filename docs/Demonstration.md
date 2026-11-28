@@ -48,7 +48,7 @@ SMTP delivery cannot guarantee exactly-once delivery. If a worker stops after SM
 - Full browser customer journey, including translated screens and mobile layout.
 - Concurrent checkout requests against the same last unit.
 - Real receipt delivery after email configuration and queue migration.
-- CF600 hardware and SDK integration.
+- CF600 reader on the Raspberry Pi (`/dev/ttyACM0`). Reading on Windows and checkout with real tags are verified.
 - Full French coverage. The language switch currently translates selected customer labels and messages.
 Re-run config/checkout.sql for card codes up to 64 characters and the ten-points-per-dollar rule. Existing receipts keep their original points.
 

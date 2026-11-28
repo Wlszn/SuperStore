@@ -1,16 +1,27 @@
+"""Chafon CF600 RFID reader -> SuperStore. Setup and usage: docs/RFID.md.
+
+    python3 scripts/RFID_Scanner.py --port /dev/ttyACM0      (Raspberry Pi)
+    python scripts/RFID_Scanner.py --port COM6                (Windows)
+
+The reader must be set to CDC_COM once (docs/RFID.md). Every tag it reads is sent to
+POST /api/scans, where the self-checkout and Receive stock pages pick it up.
+"""
 import argparse
+import json
 import sys
 import time
+import urllib.request
 
 import serial
 
-from rfid import publish
-
-PORT = "/dev/ttyUSB0"  # Change to /dev/ttyACM0 if needed
+PORT = "/dev/ttyACM0"  # the reader's virtual COM port (COM6 or similar on Windows)
 BAUD = 115200  # CF600 serial baud rate
 
-# Chafon CF600 inventory command
-READ_TAGS = bytes([0x04, 0xFF, 0x01, 0x1B, 0xB4])
+# Chafon CF600 commands (frame: CF | addr FF | command | length | data | CRC-16, high byte first).
+# Start reading: command 0x0001 with count 0 and parameter 0 = keep reading until told to stop.
+START_READING = bytes([0xCF, 0xFF, 0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF5, 0xB5])
+STOP_READING = bytes([0xCF, 0xFF, 0x00, 0x02, 0x00, 0xE7, 0x61])
+RESTART_AFTER = 5  # seconds without any data before the start command is sent again
 
 
 def parse_epcs(buf):
@@ -51,29 +62,54 @@ def parse_epcs(buf):
         i = end
 
 
+def publish(url, tags):
+    """Sends one batch of EPCs to SuperStore."""
+    request = urllib.request.Request(
+        url.rstrip("/") + "/api/scans",
+        data=json.dumps({"epcs": tags}).encode(),
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        result = json.load(response)
+        if result.get("status") != "success":
+            raise RuntimeError("SuperStore rejected the scan batch.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="CF600 serial bridge for SuperStore")
-    parser.add_argument("--port", default=PORT, help="Reader port, for example /dev/ttyUSB0 or COM3")
+    parser.add_argument("--port", default=PORT, help="Reader port, for example /dev/ttyACM0 or COM6")
     parser.add_argument("--url", default="http://127.0.0.1:8000", help="SuperStore base URL")
     args = parser.parse_args()
 
     with serial.Serial(args.port, BAUD, timeout=0.5) as reader:
         print(f"Reader connected to {args.port}. Sending scans to {args.url}.", flush=True)
+        # The reader waits for commands (answer mode): start it once and it streams one frame per tag read.
+        reader.reset_input_buffer()
+        reader.write(START_READING)
+        last_data = time.monotonic()
         buffer = b""
-        while True:
-            reader.write(READ_TAGS)
-            time.sleep(0.5)
-            buffer += reader.read(reader.in_waiting)
-            epcs, buffer = parse_epcs(buffer)
-            tags = list(dict.fromkeys(epcs))
-            for offset in range(0, len(tags), 100):
-                batch = tags[offset:offset + 100]
-                try:
-                    publish(args.url, batch)
-                    print(f"Sent {len(batch)} tag(s) to SuperStore.", flush=True)
-                except (OSError, ValueError, RuntimeError) as error:
-                    print(f"Could not send scans to {args.url}: {error}", file=sys.stderr, flush=True)
-                    time.sleep(1)
+        try:
+            while True:
+                time.sleep(0.5)
+                received = reader.read(reader.in_waiting)
+                if received:
+                    last_data = time.monotonic()
+                elif time.monotonic() - last_data > RESTART_AFTER:
+                    reader.write(START_READING)  # in case the reader stopped reading (for example after a reset)
+                    last_data = time.monotonic()
+                buffer += received
+                epcs, buffer = parse_epcs(buffer)
+                tags = list(dict.fromkeys(epcs))
+                for offset in range(0, len(tags), 100):
+                    batch = tags[offset:offset + 100]
+                    try:
+                        publish(args.url, batch)
+                        print(f"Sent {len(batch)} tag(s) to SuperStore.", flush=True)
+                    except (OSError, ValueError, RuntimeError) as error:
+                        print(f"Could not send scans to {args.url}: {error}", file=sys.stderr, flush=True)
+                        time.sleep(1)
+        finally:
+            reader.write(STOP_READING)  # leave the reader idle when the script stops
 
 
 if __name__ == "__main__":

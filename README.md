@@ -53,11 +53,11 @@ The application has two sides:
 ## Architecture
 
 ```
-ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ──HTTP──▶ ┐
-RFID reader ───────────▶ reader script ────HTTP──────────▶ │ PHP app (Pi) ──REST──▶ Supabase
-Barcode scanner ──▶ browser (types like a keyboard) ─────▶ │
-                         fan.py ◀── GET /api/fan ───────── ┘
-                           └──GPIO──▶ motor driver ──▶ DC motor
+ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ◀──HTTP───▶ ┐
+MSP01 sensor ──BLE──▶ Pareto Anywhere ──▶ ble.py ──HTTP────▶ │
+RFID reader ──────────▶ RFID_Scanner.py ───HTTP────────────▶ │ PHP app (Pi) ──REST──▶ Supabase
+Barcode scanner ──▶ browser (types like a keyboard) ───────▶ ┘
+                         monitor.py ──GPIO──▶ motor driver ──▶ DC motor
 ```
 
 Devices never talk to the database directly: every device and page goes through the PHP API, and only the models talk to Supabase.
@@ -96,7 +96,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ### 2. Database
 
-For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql` and `config/reports.sql`, `config/ble.sql` in that order. All three are safe to run again on an existing database. Give your account admin access:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql`, `config/reports.sql` and `config/ble.sql`, in that order. All four are safe to run again on an existing database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -109,12 +109,11 @@ sudo apt install php-cli php-curl mosquitto python3-gpiozero python3-paho-mqtt p
 php -S 0.0.0.0:8000 -t public
 ```
 
-In separate terminals:
+In separate terminals, start the Phase 2 script and the BLE sensor bridge (it needs Pareto Anywhere running and `BLE_SENSOR_MAC` set in `.env`):
 
 ```bash
-python3 scripts/monitor.py   # fridge readings and email alerts
-python3 scripts/fan.py       # fan motor
-python3 scripts/ble.py
+python3 scripts/monitor.py   # fridge readings, alert emails and the fan motor
+python3 scripts/ble.py       # MSP01 sensor readings through Pareto Anywhere
 ```
 
 Allow the ESP32 boards to reach the broker (`/etc/mosquitto/conf.d/superstore.conf`), then restart Mosquitto:
@@ -126,11 +125,15 @@ allow_anonymous true
 
 ### 4. ESP32 boards
 
-Open `scripts/mqtt.py` (an Arduino sketch) in the Arduino IDE, install **PubSubClient** and **DHT sensor library**, set the Wi-Fi credentials and the Pi's IP address, and flash one board with `TOPIC = "Frig1"` and the other with `"Frig2"`.
+Open `scripts/esp32_sensor/esp32_sensor.ino` in the Arduino IDE, install **PubSubClient** and **DHT sensor library**, set the Wi-Fi credentials and the Pi's IP address, and flash one board with `TOPIC = "Frig1"` and the other with `"Frig2"`.
 
 ### 5. RFID reader
 
-See [CF600 reader setup](docs/RFID.md) for the USB SDK bridge used by the checkout and product pages.
+Set the reader to **CDC_COM** once (see [CF600 reader setup](docs/RFID.md)), plug it into the Pi, then in another terminal:
+
+```bash
+python3 scripts/RFID_Scanner.py --port /dev/ttyACM0
+```
 
 ### 6. Checkout demo and receipt email
 
@@ -146,7 +149,8 @@ See the [demonstration guide](docs/Demonstration.md) for the delivery, scan, pay
 | Products (admin) | `GET /products`, `/products/create`, `/products/edit`, `/products/show`, `/products/receive` |
 | Product actions (admin) | `POST /products`, `/products/update`, `/products/delete`, `/receptions` |
 | Scanners | `GET /api/products/lookup?code=` (barcode), `GET /api/items/lookup?epcs=` (RFID tags), `POST /api/scans`, `GET /api/scans/latest` |
-| BLE sensor | POST /api/ble-readings, GET /api/ble-readings latest |
+| BLE sensor | `POST /api/ble-readings`, `GET /api/ble-readings/latest` |
+
 Request and response formats: [`docs/API.md`](docs/API.md).
 
 ## Database
@@ -162,7 +166,7 @@ Design, relationships and examples: [`docs/ER.md`](docs/ER.md). Editable diagram
 | 2 × ESP32 + DHT11 | 2 | Wi-Fi (MQTT) |
 | DC motor + driver | 2 | GPIO 22 (enable), 27 (in 1), 17 (in 2) |
 | USB barcode scanner | 3 | USB (keyboard mode) |
-| Chafon CF600 RFID reader | 3 | USB (SDK bridge) |
+| Chafon CF600 RFID reader | 3 | USB (virtual COM port, `/dev/ttyACM0`) |
 
 All pins use BCM numbering on a Raspberry Pi 5.
 
