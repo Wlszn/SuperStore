@@ -131,6 +131,26 @@ h2 { margin-bottom: 14px; font-size: 15px; font-weight: 650; }
 .ranking-list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
 .ranking-list .rank { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
 .ranking-list .empty { padding: 12px 0 0; }
+.inventory-charts { margin-bottom: 0; }
+.print-report-meta { display: none; }
+.inventory-pie-layout { display: grid; grid-template-columns: minmax(100px, .8fr) 1fr; align-items: center; gap: 16px; margin-top: 12px; }
+.product-stock-pie { display: block; width: min(100%, 190px); margin: auto; }
+.pie-available { fill: #4c9a6a; }
+.pie-low { fill: #e5a331; }
+.pie-out { fill: #b4424c; }
+.product-stock-legend { font-size: 13px; }
+.product-stock-legend li { align-items: center; }
+.product-stock-legend li > span { display: inline-flex; align-items: center; gap: 8px; }
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.legend-dot.available { background: #4c9a6a; }
+.legend-dot.low { background: #e5a331; }
+.legend-dot.out { background: #b4424c; }
+.product-stock-chart { display: grid; gap: 2px; margin: 10px 0 0; padding: 0; list-style: none; }
+.product-stock-chart li { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(45px, 2fr) auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.chart-product-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.product-stock-track { height: 12px; overflow: hidden; border-radius: 6px; background: #edf0f3; }
+.product-stock-bar { display: block; height: 100%; border-radius: inherit; background: var(--blue); transition: width .25s ease; }
+.product-stock-chart strong { min-width: 2ch; text-align: right; font-variant-numeric: tabular-nums; }
 .filter-group { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
 .trend-panel { padding: 16px; margin-bottom: 20px; }
 .trend-panel h2 { display: flex; gap: 10px; align-items: baseline; }
@@ -236,6 +256,7 @@ dialog .notice { margin: 14px 0 0; }
     .stats.four > div:nth-child(3) { border-left: 0; }
     .stats.four > div:nth-child(n+3) { border-top: 1px solid var(--line); }
     .ranking { grid-template-columns: 1fr; }
+    .inventory-pie-layout { grid-template-columns: minmax(100px, .7fr) 1fr; }
     .fields { grid-template-columns: 1fr; }
     .toolbar .search { width: 100%; }
 }
@@ -254,6 +275,36 @@ dialog .notice { margin: 14px 0 0; }
     flex-wrap: wrap;
     gap: 8px 14px;
     margin-top: 12px;
+}
+
+@page { size: A4 portrait; margin: 14mm; }
+@media print {
+    body { background: #fff; color: #17212b; font-size: 10pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .workspace { display: block; min-height: 0; }
+    .sidebar, .topbar, .page-heading, [data-inventory-url], .notice { display: none !important; }
+    #main { width: 100%; min-height: 0; }
+    .content { padding: 0; }
+    .print-report-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 0 0 9px; border-bottom: 2px solid #234b78; color: #596371; font-size: 9pt; }
+    .print-report-meta strong { color: #234b78; font-size: 13pt; letter-spacing: .04em; }
+    .inventory-report { border: 0; }
+    .inventory-report .section-heading { padding: 12px 0; }
+    .inventory-report .section-heading h2 { color: #17212b; font-size: 20pt; }
+    .inventory-report .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; border: 0; }
+    .inventory-report .stats > div { padding: 9px 10px; border: 1px solid #dfe4ea; border-radius: 6px; background: #f7f9fb; }
+    .inventory-report .stats > div + div { border-left: 1px solid #dfe4ea; }
+    .inventory-report .stats dt { color: #596371; font-size: 8pt; }
+    .inventory-report .stats dd { margin-top: 4px; color: #17212b; font-size: 17pt; }
+    .inventory-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .ranking-list { break-inside: avoid; padding: 12px; border-color: #dfe4ea; }
+    .ranking-list h2 { padding-bottom: 7px; border-bottom: 1px solid #dfe4ea; color: #234b78; font-size: 10pt; }
+    .inventory-pie-layout { grid-template-columns: minmax(90px, .75fr) 1fr; gap: 10px; }
+    .product-stock-chart li { break-inside: avoid; padding: 6px 0; }
+    .chart-product-name, .product-stock-legend { font-size: 8pt; }
+    .product-stock-chart strong, .product-stock-legend strong { color: #17212b; font-size: 8pt; }
+    .product-stock-pie, .legend-dot, .product-stock-track, .product-stock-bar {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
 }
 .reader-controls .hint { margin: 0; }
 .reader-controls .hint.error { color: var(--red); }

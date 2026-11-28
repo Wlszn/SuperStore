@@ -54,6 +54,7 @@ The application has two sides:
 
 ```
 ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ◀──HTTP───▶ ┐
+MSP01 sensor ──BLE──▶ Pareto Anywhere ──▶ ble.py ──HTTP────▶ │
 RFID reader ──────────▶ RFID_Scanner.py ───HTTP────────────▶ │ PHP app (Pi) ──REST──▶ Supabase
 Barcode scanner ──▶ browser (types like a keyboard) ───────▶ ┘
                          monitor.py ──GPIO──▶ motor driver ──▶ DC motor
@@ -95,7 +96,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ### 2. Database
 
-For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql` and `config/reports.sql`, in that order. All three are safe to run again on an existing database. Give your account admin access:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql`, `config/reports.sql` and `config/ble.sql`, in that order. All four are safe to run again on an existing database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -108,10 +109,11 @@ sudo apt install php-cli php-curl mosquitto python3-gpiozero python3-paho-mqtt p
 php -S 0.0.0.0:8000 -t public
 ```
 
-In a second terminal, start the Phase 2 script (fridge readings, alert emails and the fan motor):
+In separate terminals, start the Phase 2 script and the BLE sensor bridge (it needs Pareto Anywhere running and `BLE_SENSOR_MAC` set in `.env`):
 
 ```bash
-python3 scripts/monitor.py
+python3 scripts/monitor.py   # fridge readings, alert emails and the fan motor
+python3 scripts/ble.py       # MSP01 sensor readings through Pareto Anywhere
 ```
 
 Allow the ESP32 boards to reach the broker (`/etc/mosquitto/conf.d/superstore.conf`), then restart Mosquitto:
@@ -147,6 +149,7 @@ See the [demonstration guide](docs/Demonstration.md) for the delivery, scan, pay
 | Products (admin) | `GET /products`, `/products/create`, `/products/edit`, `/products/show`, `/products/receive` |
 | Product actions (admin) | `POST /products`, `/products/update`, `/products/delete`, `/receptions` |
 | Scanners | `GET /api/products/lookup?code=` (barcode), `GET /api/items/lookup?epcs=` (RFID tags), `POST /api/scans`, `GET /api/scans/latest` |
+| BLE sensor | `POST /api/ble-readings`, `GET /api/ble-readings/latest` |
 
 Request and response formats: [`docs/API.md`](docs/API.md).
 
