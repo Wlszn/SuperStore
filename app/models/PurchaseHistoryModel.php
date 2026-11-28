@@ -89,18 +89,80 @@ class PurchaseHistoryModel
         ];
     }
 
-    /** The items this customer has bought at least once, A to Z (the Price history dropdown). */
-    public function itemNames(int $customerId): array
+    /**
+     * Membership tab: every purchase that earned or spent points, newest first, with the
+     * all-time totals. Only the given customer's purchases.
+     */
+    public function pointsActivity(int $customerId): array
+    {
+        $rows = SupaClient::rows('GET', 'purchases', [
+            'select' => 'id,purchased_at,total,points_earned,points_redeemed',
+            'customer_id' => 'eq.' . $customerId,
+            'order' => 'purchased_at.desc',
+        ]);
+        $local = new DateTimeZone(date_default_timezone_get());
+        $activity = [];
+        foreach ($rows as $row) {
+            if ((int) $row['points_earned'] === 0 && (int) $row['points_redeemed'] === 0) {
+                continue;
+            }
+            $activity[] = [
+                'id' => (int) $row['id'],
+                'purchased_at' => (new DateTimeImmutable($row['purchased_at']))->setTimezone($local),
+                'total' => (float) $row['total'],
+                'earned' => (int) $row['points_earned'],
+                'redeemed' => (int) $row['points_redeemed'],
+            ];
+        }
+
+        return [
+            'earned' => array_sum(array_column($activity, 'earned')),
+            'redeemed' => array_sum(array_column($activity, 'redeemed')),
+            'purchases' => count($rows),
+            'recent' => array_slice($activity, 0, 8),
+        ];
+    }
+
+    /**
+     * Profile tab "At a glance": total paid, number of receipts and the last purchase
+     * (null if none), over all of this customer's purchases.
+     */
+    public function overview(int $customerId): array
+    {
+        $rows = SupaClient::rows('GET', 'purchases', [
+            'select' => 'total,purchased_at',
+            'customer_id' => 'eq.' . $customerId,
+            'order' => 'purchased_at.desc',
+            'limit' => 1000,
+        ]);
+
+        return [
+            'spent' => round(array_sum(array_map('floatval', array_column($rows, 'total'))), 2),
+            'orders' => count($rows),
+            'last' => $rows === [] ? null
+                : (new DateTimeImmutable($rows[0]['purchased_at']))->setTimezone(new DateTimeZone(date_default_timezone_get())),
+        ];
+    }
+
+    /**
+     * The items this customer has bought at least once, A to Z, each with the units bought:
+     * ['Coca-Cola' => 6, 'KitKat' => 3]. The keys fill the Price history dropdown, the counts
+     * pick the "Most bought" shortcuts.
+     */
+    public function itemCounts(int $customerId): array
     {
         $rows = SupaClient::rows('GET', 'purchase_items', [
             // !inner: only lines of this customer's receipts.
-            'select' => 'name,purchases!inner(customer_id)',
+            'select' => 'name,quantity,purchases!inner(customer_id)',
             'purchases.customer_id' => 'eq.' . $customerId,
         ]);
-        $names = array_values(array_unique(array_column($rows, 'name')));
-        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[$row['name']] = ($counts[$row['name']] ?? 0) + (int) $row['quantity'];
+        }
+        uksort($counts, static fn (string $a, string $b): int => strnatcasecmp($a, $b));
 
-        return $names;
+        return $counts;
     }
 
     /**
@@ -109,14 +171,14 @@ class PurchaseHistoryModel
      * dropdown), in ONE request, grouped by item, oldest first.
      *
      * Each item: name, times (receipts it appears on), units, first_price, last_price,
-     * change_percent (first to last) and purchases [purchase_id, purchased_at, unit_price,
+     * lowest_price, highest_price, change_percent (first to last) and purchases [purchase_id, purchased_at, unit_price,
      * quantity, change, change_percent], where change is the price difference with the
      * previous purchase of the same item (null for the first one).
      */
     public function itemHistory(int $customerId, string $search, bool $exact = false): array
     {
         if ($exact) {
-            $filter = 'eq.' . $search;   // a name from itemNames(), matched as it is
+            $filter = 'eq.' . $search;   // a name from itemCounts(), matched as it is
         } else {
             // Keep only what the customer typed: no wildcards or filter syntax of our own.
             $term = trim((string) preg_replace('/[*%(),\\\\]+/', ' ', $search));
@@ -163,6 +225,8 @@ class PurchaseHistoryModel
                 'units' => array_sum(array_column($purchases, 'quantity')),
                 'first_price' => $first,
                 'last_price' => $last,
+                'lowest_price' => min(array_column($purchases, 'unit_price')),
+                'highest_price' => max(array_column($purchases, 'unit_price')),
                 'change_percent' => $first > 0 ? round(($last - $first) / $first * 100, 1) : null,
                 'purchases' => $purchases,
             ];

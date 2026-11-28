@@ -5,7 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!canvas || !window.Chart) return;
 
     const money = value => '$' + Number(value).toFixed(2);
-    const ink = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#5d6875';
+    // Colours from the page's theme (light or dark); theme.js updates them when the user switches.
+    const theme = getComputedStyle(document.documentElement);
+    const ink = theme.getPropertyValue('--muted').trim() || '#5d6875';
+    const grid = theme.getPropertyValue('--line').trim() || '#e2e6ec';
 
     new window.Chart(canvas, {
         type: 'bar',
@@ -35,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 y: {
                     beginAtZero: true,
                     border: { display: false },
-                    grid: { color: 'rgba(0, 0, 0, 0.06)' },
+                    grid: { color: grid },
                     ticks: { color: ink, callback: money, maxTicksLimit: 5 },
                 },
             },

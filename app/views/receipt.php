@@ -10,7 +10,16 @@ $purchasedAt = (new DateTimeImmutable($receipt['purchased_at']))->setTimezone(ne
 ?>
 
 <header class="page-heading receipt-actions">
-    <h1 data-i18n>Checkout completed</h1>
+    <div>
+        <h1 data-i18n>Checkout completed</h1>
+        <?php if (isset($_SESSION['receipt_emailed'][$receiptId])): ?>
+            <?php
+            // The kiosk screen is public: show only the start of the address.
+            [$user, $domain] = explode('@', $_SESSION['receipt_emailed'][$receiptId], 2) + [1 => ''];
+            ?>
+            <p class="hint" data-i18n>A copy was emailed to <?= $e(mb_substr($user, 0, 2) . '•••@' . $domain) ?>.</p>
+        <?php endif; ?>
+    </div>
     <button class="button" type="button" onclick="window.print()" data-i18n>Print receipt</button>
 </header>
 

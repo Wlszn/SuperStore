@@ -4,7 +4,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.Chart) return;
     const money = value => '$' + Number(value).toFixed(2);
-    const ink = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#5d6875';
+    // Colours from the page's theme (light or dark); theme.js updates them when the user switches.
+    const theme = getComputedStyle(document.documentElement);
+    const ink = theme.getPropertyValue('--muted').trim() || '#5d6875';
+    const grid = theme.getPropertyValue('--line').trim() || '#e2e6ec';
+    const canvasColour = theme.getPropertyValue('--canvas').trim() || '#ffffff';
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     for (const canvas of document.querySelectorAll('.price-chart')) {
@@ -23,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     borderWidth: 2,
                     pointRadius: 5,          // every purchase is a visible point
                     pointHoverRadius: 7,
-                    pointBorderColor: '#ffffff',
+                    pointBorderColor: canvasColour,
                     pointBorderWidth: 2,
                     tension: 0,
                 }],
@@ -57,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: {
                         grace: '15%',   // room above and below so small price changes are visible
                         border: { display: false },
-                        grid: { color: 'rgba(0, 0, 0, 0.06)' },
+                        grid: { color: grid },
                         ticks: { color: ink, callback: money, maxTicksLimit: 5 },
                     },
                 },
