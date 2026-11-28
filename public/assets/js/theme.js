@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 // Light/dark mode. Loaded in <head> without defer: it sets data-theme on <html> before the page
 // is drawn, so a dark page never flashes white. The colours themselves are CSS variables
 // (inventory.css and style.css). Until the user clicks the switch, the page follows the
@@ -60,5 +61,40 @@
     window.addEventListener('afterprint', () => {
         if (screenTheme) apply(screenTheme);
         screenTheme = null;
+=======
+(() => {
+    const storageKey = 'superstore.theme';
+    let theme = 'light';
+    try {
+        const savedTheme = localStorage.getItem(storageKey);
+        theme = savedTheme === 'dark' || savedTheme === 'light'
+            ? savedTheme
+            : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    } catch {}
+
+    document.documentElement.dataset.theme = theme;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const button = document.getElementById('theme-switch');
+        if (!button) return;
+
+        function renderButton() {
+            const label = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+            button.dataset.i18nAriaLabel = label;
+            button.setAttribute('aria-label', window.translate(label));
+            button.setAttribute('aria-pressed', String(theme === 'dark'));
+        }
+
+        button.addEventListener('click', () => {
+            theme = theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = theme;
+            try {
+                localStorage.setItem(storageKey, theme);
+            } catch {}
+            renderButton();
+        });
+
+        renderButton();
+>>>>>>> Stashed changes
     });
 })();
