@@ -36,7 +36,8 @@ The application has two sides:
 - Product types identified by their barcode (UPC), with a category from a fixed list and a producer: "KitKat 4 Finger 45g" by Nestle
 - Every physical item has its own RFID tag (EPC). Receiving stock = scan the type's barcode, put all the new items on the reader
 - Stock = tagged items not sold yet; low-stock flags
-- Self-checkout (RFID only): put everything on the reader, all items appear at once, grouped by type ("KitKat × 5"); membership card, payment simulation, points, emailed receipt (email requires the receipt worker)
+- Customer accounts: profile editing, password change and "Forgot your password?" by email; admins see every customer, edit accounts and can email a password reset link
+- Self-checkout (RFID only): put everything on the reader, all items appear at once, grouped by type ("KitKat × 5"); membership card, payment simulation, points, emailed receipt with a thank-you message (sent through Brevo right after payment)
 
 ## Tech Stack
 
@@ -91,12 +92,15 @@ Copy `.env.example` to `.env` and fill in:
 |---|---|
 | `SUPABASE_URL` | Supabase → Project Settings → API |
 | `SUPABASE_SECRET_KEY` | Secret key (server only, never commit it) |
-| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Gmail account and app password used to send emails |
+| `BREVO_API_KEY` | Brevo → SMTP & API → API keys (free plan: 300 emails a day). Sends receipts and password reset emails |
+| `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME` | The sender: an address verified in Brevo (Senders, domains & IPs), and the name shown, e.g. `SuperStore` |
+| `APP_URL` | Address customers open the site at, used in email links, e.g. `http://192.168.1.50:8000` |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Gmail account and app password used by `monitor.py` for fridge alerts and the YES reply |
 | `ALERT_TO` | Address that receives fridge alerts (defaults to `GMAIL_USER`) |
 
 ### 2. Database
 
-For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql`, `config/reports.sql` and `config/ble.sql`, in that order. All four are safe to run again on an existing database. Give your account admin access:
+For a fresh database, run `config/db.sql` in the Supabase SQL Editor. Then apply `config/checkout.sql`, `config/receipt_emails.sql`, `config/reports.sql`, `config/ble.sql` and `config/password_resets.sql`, in that order. All five are safe to run again on an existing database. Give your account admin access:
 
 ```sql
 UPDATE customers SET is_admin = TRUE WHERE email = 'you@example.com';
@@ -137,13 +141,15 @@ python3 scripts/RFID_Scanner.py --port /dev/ttyACM0
 
 ### 6. Checkout demo and receipt email
 
-See the [demonstration guide](docs/Demonstration.md) for the delivery, scan, payment, and receipt workflow. Run `python3 scripts/receipt_worker.py` with the Gmail settings configured to send receipt emails.
+See the [demonstration guide](docs/Demonstration.md) for the delivery, scan, payment, and receipt workflow. With the Brevo settings in `.env`, members get their receipt by email as soon as they pay; nothing else needs to run.
 
 ## API
 
 | Area | Routes |
 |---|---|
-| Accounts | `POST /register`, `POST /login`, `GET /logout` |
+| Accounts | `POST /register`, `POST /login`, `GET /logout`, `GET/POST /forgot-password`, `GET/POST /reset-password` |
+| My account | `GET /account`, `POST /account/profile`, `/account/password`, `/account/membership`, `GET /account/orders/export`, `/account/prices/export` |
+| Customers (admin) | `GET /customers`, `/customers/export`, `/customers/edit`, `POST /customers/update`, `/customers/reset-password` |
 | Dashboard | `GET /dashboard`, `GET/POST /thresholds`, `GET /api/thresholds` |
 | Sensors and fan | `POST /api/readings`, `GET /api/readings/latest`, `GET/POST /api/fan` |
 | Products (admin) | `GET /products`, `/products/create`, `/products/edit`, `/products/show`, `/products/receive` |

@@ -31,17 +31,19 @@ Without the reader, simulate one batch from PowerShell:
 
     Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/scans -ContentType 'application/json' -Body '{"epcs":["E28011700000020A1B2C3D03","E28011700000020A1B2C3D04","E28011700000020A1B2C3D01"]}'
 
-## Receipt email setup
+## Email setup (receipts and password resets)
 
-Run config/receipt_emails.sql in Supabase SQL Editor after config/checkout.sql.
+Emails go through Brevo's API (free plan: 300 emails a day, no credit card).
 
-Configure GMAIL_USER and GMAIL_APP_PASSWORD in .env. The sender uses a Gmail app password. Start the worker with:
+1. Create a free account at brevo.com.
+2. Under Senders, domains & IPs, add and verify the address the emails come from (Brevo emails it a confirmation link).
+3. Under SMTP & API, create an API key.
+4. In .env set BREVO_API_KEY, MAIL_FROM_EMAIL (the verified address), MAIL_FROM_NAME=SuperStore and APP_URL (the address customers open the site at, used in the password reset links).
+5. Run config/receipt_emails.sql and config/password_resets.sql in the Supabase SQL Editor.
 
-    python scripts/receipt_worker.py
+When a member pays, the receipt is emailed right away with a short thank-you message, and the receipt page shows where it was sent. Guests have no email address, so they get none. receipt_emails records each receipt email as sent or failed. If Brevo cannot be reached, the payment still completes; only the email is missing.
 
-New member purchases queue email to the email address stored on the customer account. Guest purchases have no email recipient. The worker sends the receipt and retries failed deliveries up to five attempts with at least five minutes between attempts. Payment remains completed when email fails.
-
-SMTP delivery cannot guarantee exactly-once delivery. If a worker stops after SMTP accepts a message and before the database is updated, its job remains in sending status. Inspect that job before resetting it to pending to avoid an unintended duplicate.
+Password resets: "Forgot your password?" on the sign-in page, or "Send password reset email" on an admin's Edit customer page. The link works once and expires after one hour.
 
 ## Remaining verification
 

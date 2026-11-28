@@ -188,3 +188,24 @@ input.invalid { border-color: #b13c2e; }
 .auth-page input { border-color: #d7dfe7; accent-color: var(--accent); }
 .auth-page input:focus { outline-color: #3774b2; }
 .auth-page input.invalid { border-color: #b13c2e; }
+
+/* Light/dark switch and dark mode for the sign-in and sign-up pages. theme.js sets data-theme on <html>. */
+.language-control { gap: 8px; }
+.container .theme-switch { display: inline-flex; align-items: center; justify-content: center; width: auto; min-width: 44px; padding: 6px 10px; }
+.theme-switch svg { display: block; width: 16px; height: 16px; }
+:root[data-theme="dark"] .theme-switch .icon-moon, :root:not([data-theme="dark"]) .theme-switch .icon-sun { display: none; }
+@media screen {
+    :root[data-theme="dark"] { color-scheme: dark; }
+    :root[data-theme="dark"] .auth-page { --ink: #e4e8ed; --muted: #9ba6b4; --line: #2a313a; --accent: #78a9e0; --background: #13171c; }
+    :root[data-theme="dark"] .auth-page .container { background: #181d23; }
+    :root[data-theme="dark"] .auth-page input { background: #1b2128; border-color: #36404b; }
+    :root[data-theme="dark"] .auth-page input:focus { outline-color: #78a9e0; }
+    :root[data-theme="dark"] .auth-page button { color: #0c1622; }
+    :root[data-theme="dark"] .auth-page button:hover:not(:disabled) { background: #95bce8; }
+    :root[data-theme="dark"] .auth-page .field-error,
+    :root[data-theme="dark"] .form-message.error { color: #f2959e; }
+    :root[data-theme="dark"] .auth-page input.invalid { border-color: #f2959e; }
+    :root[data-theme="dark"] .form-message.error { border-color: #63303a; }
+    :root[data-theme="dark"] .form-message.success { color: #86d3a2; border-color: #285a3d; }
+    :root[data-theme="dark"] .switch-page.guest-link { border-top-color: var(--line); }
+}

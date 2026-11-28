@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\ScanModel;
+use App\Models\CustomerModel;
 use App\Models\PurchaseHistoryModel;
+use App\Services\Mailer;
 use App\Services\SupaClient;
 use DateTimeImmutable;
+use DateTimeZone;
 use RuntimeException;
 use function config\supa_request;
 
@@ -126,6 +129,10 @@ class CheckoutController
                 }
             }
             $_SESSION['receipts'][(int) $receipt['id']] = true;
+            if ($customerId !== null) {
+                // Members get their receipt by email right away (no worker script needed).
+                $this->emailReceipt((int) $receipt['id']);
+            }
             jsonResponse(200, [
                 'status' => 'success',
                 'receipt_id' => (int) $receipt['id'],
@@ -176,19 +183,7 @@ class CheckoutController
 
     public function membership(): void
     {
-        if (!isset($_SESSION['customer_id'])) {
-            jsonResponse(401, [
-                'status' => 'error',
-                'message' => 'Please sign in first.',
-            ]);
-            return;
-        }
-        if (empty($_SESSION['csrf_token']) || !is_string($_POST['csrf_token'] ?? null) ||
-            !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-            jsonResponse(403, [
-                'status' => 'error',
-                'message' => 'Reload the account page and try again.',
-            ]);
+        if (!$this->accountActionAllowed()) {
             return;
         }
         $code = trim(is_string($_POST['membership_number'] ?? null) ? $_POST['membership_number'] : '');
@@ -217,6 +212,138 @@ class CheckoutController
         }
     }
 
+    /**
+     * Emails a member their receipt through Brevo (App\Services\Mailer). The payment is already
+     * saved, so a failure here is only logged: it never turns a paid checkout into an error.
+     * The receipt page then shows where the copy went.
+     */
+    private function emailReceipt(int $purchaseId): void
+    {
+        try {
+            $purchase = SupaClient::rows('GET', 'purchases', [
+                'id' => 'eq.' . $purchaseId,
+                'select' => 'id,customer_id,total,points_earned,points_redeemed,payment_method,purchased_at,purchase_items(name,unit_price,quantity)',
+            ])[0] ?? null;
+            $customer = $purchase === null ? null : (SupaClient::rows('GET', 'customers', [
+                'id' => 'eq.' . $purchase['customer_id'],
+                'select' => 'name,email,points',
+            ])[0] ?? null);
+        } catch (RuntimeException $error) {
+            return;
+        }
+        if ($purchase === null || $customer === null || ($customer['email'] ?? '') === '') {
+            return;
+        }
+        $reference = 'SS-' . str_pad((string) $purchaseId, 6, '0', STR_PAD_LEFT);
+        $sent = Mailer::send(
+            $customer['email'],
+            $customer['name'],
+            'Your SuperStore receipt / Votre reçu SuperStore ' . $reference,
+            Mailer::render('receipt', ['purchase' => $purchase, 'customer' => $customer])
+        );
+        if ($sent) {
+            $_SESSION['receipt_emailed'][$purchaseId] = $customer['email'];
+        }
+        // receipt_emails (config/receipt_emails.sql) keeps a record of each receipt email.
+        try {
+            SupaClient::rows('PATCH', 'receipt_emails', ['purchase_id' => 'eq.' . $purchaseId], [
+                'status' => $sent ? 'sent' : 'failed',
+                'attempts' => 1,
+                'updated_at' => gmdate('Y-m-d\TH:i:s\Z'),
+            ]);
+        } catch (RuntimeException $error) {
+            // config/receipt_emails.sql not run yet: the email itself is what matters.
+        }
+    }
+
+    /** POST /account/profile: the signed-in customer changes their name, email, phone or address. */
+    public function profile(): void
+    {
+        if (!$this->accountActionAllowed()) {
+            return;
+        }
+        $fields = [];
+        foreach (['name', 'email', 'phone', 'address'] as $field) {
+            $fields[$field] = trim(is_string($_POST[$field] ?? null) ? $_POST[$field] : '');
+        }
+        $errors = CustomerModel::validateData($fields['name'], $fields['email'], $fields['phone'], $fields['address']);
+        if ($errors !== []) {
+            jsonResponse(422, ['status' => 'error', 'message' => 'Please fix the highlighted fields and try again.', 'errors' => $errors]);
+            return;
+        }
+        try {
+            $owner = CustomerModel::findByEmail($fields['email']);
+            if ($owner !== null && $owner->getId() !== (int) $_SESSION['customer_id']) {
+                jsonResponse(409, [
+                    'status' => 'error',
+                    'message' => 'Please fix the highlighted fields and try again.',
+                    'errors' => ['email' => 'Another account already uses this email address.'],
+                ]);
+                return;
+            }
+            // Only these four columns: points and the membership card are never touched here.
+            SupaClient::rows('PATCH', 'customers', ['id' => 'eq.' . $_SESSION['customer_id']], $fields);
+        } catch (RuntimeException $error) {
+            jsonResponse(503, ['status' => 'error', 'message' => 'Could not save your profile. Please try again.']);
+            return;
+        }
+        $_SESSION['customer_name'] = $fields['name'];
+        jsonResponse(200, ['status' => 'success', 'message' => 'Your profile was updated.']);
+    }
+
+    /** POST /account/password: the current password, then the new one twice. */
+    public function password(): void
+    {
+        if (!$this->accountActionAllowed()) {
+            return;
+        }
+        $current = is_string($_POST['current_password'] ?? null) ? $_POST['current_password'] : '';
+        $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
+        $errors = CustomerModel::validatePassword($password, is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '');
+        if ($current === '') {
+            $errors['current_password'] = 'Please enter your current password.';
+        } elseif ($password !== '' && $password === $current && !isset($errors['password'])) {
+            $errors['password'] = 'Choose a password different from your current one.';
+        }
+        if ($errors !== []) {
+            jsonResponse(422, ['status' => 'error', 'message' => 'Please fix the highlighted fields and try again.', 'errors' => $errors]);
+            return;
+        }
+        try {
+            $customer = CustomerModel::findById((int) $_SESSION['customer_id']);
+            if ($customer === null || !$customer->verifyPassword($current)) {
+                jsonResponse(422, [
+                    'status' => 'error',
+                    'message' => 'Please fix the highlighted fields and try again.',
+                    'errors' => ['current_password' => 'This is not your current password.'],
+                ]);
+                return;
+            }
+            $customer->setPassword($password);
+            SupaClient::rows('PATCH', 'customers', ['id' => 'eq.' . $_SESSION['customer_id']], ['password_hash' => $customer->getPasswordHash()]);
+        } catch (RuntimeException $error) {
+            jsonResponse(503, ['status' => 'error', 'message' => 'Could not change your password. Please try again.']);
+            return;
+        }
+        session_regenerate_id(true); // a new session id after a credential change
+        jsonResponse(200, ['status' => 'success', 'message' => 'Your password was changed.']);
+    }
+
+    /** Account forms: signed in, and the form's CSRF token matches. Sends the error itself. */
+    private function accountActionAllowed(): bool
+    {
+        if (!isset($_SESSION['customer_id'])) {
+            jsonResponse(401, ['status' => 'error', 'message' => 'Please sign in first.']);
+            return false;
+        }
+        if (empty($_SESSION['csrf_token']) || !is_string($_POST['csrf_token'] ?? null) ||
+            !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+            jsonResponse(403, ['status' => 'error', 'message' => 'Reload the account page and try again.']);
+            return false;
+        }
+        return true;
+    }
+
     public function account(): void
     {
         if (!isset($_SESSION['customer_id'])) {
@@ -227,25 +354,30 @@ class CheckoutController
         try {
             $customer = SupaClient::rows('GET', 'customers', [
                 'id' => 'eq.' . $_SESSION['customer_id'],
-                'select' => 'name,email,phone,address,membership_number,points',
+                'select' => 'name,email,phone,address,membership_number,points,created_at',
             ])[0] ?? null;
+            // Profile tab "At a glance": shopping totals and the item bought most.
+            $glance = null;
+            if (($_GET['tab'] ?? 'profile') === 'profile') {
+                $history = new PurchaseHistoryModel();
+                $glance = $history->overview((int) $_SESSION['customer_id']);
+                $counts = $history->itemCounts((int) $_SESSION['customer_id']);
+                arsort($counts);
+                $glance['favourite'] = $counts === [] ? null : ['name' => array_key_first($counts), 'units' => reset($counts)];
+            }
+            // Membership tab: points earned and spent with the card.
+            $pointsActivity = ($_GET['tab'] ?? '') === 'membership'
+                ? (new PurchaseHistoryModel())->pointsActivity((int) $_SESSION['customer_id'])
+                : null;
             // Orders tab (P4-17): receipts for one day or a date range, the last 30 days by default.
-            $today = (new DateTimeImmutable('today'))->format('Y-m-d');
-            $filters = [
-                'mode' => ($_GET['mode'] ?? 'range') === 'day' ? 'day' : 'range',
-                'day' => (string) ($_GET['day'] ?? $today),
-                'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-29 days'))->format('Y-m-d')),
-                'to' => (string) ($_GET['to'] ?? $today),
-            ];
-            // A single day is a range where from = to.
-            $from = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
-            $to = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
+            // Only loaded on that tab, so the other tabs do not wait for the receipt history.
+            [$filters, $from, $to] = $this->orderPeriod();
             $receipts = [];
             $spending = null;
             $historyError = null;
-            if ($from === null || $to === null || $from > $to) {
+            if (($_GET['tab'] ?? '') === 'orders' && ($from === null || $to === null || $from > $to)) {
                 $historyError = 'Choose a valid date range (\'from\' must be before \'to\').';
-            } else {
+            } elseif (($_GET['tab'] ?? '') === 'orders') {
                 // The session's customer id: customers only ever see their own receipts.
                 $history = new PurchaseHistoryModel();
                 $receipts = $history->receipts((int) $_SESSION['customer_id'], $from, $to);
@@ -257,12 +389,19 @@ class CheckoutController
             $itemSearch = trim((string) ($_GET['q'] ?? ''));
             $itemChoice = trim((string) ($_GET['item'] ?? ''));
             $itemNames = [];
+            $topItems = [];
             $itemResults = [];
             $itemError = null;
             if (($_GET['tab'] ?? '') === 'prices') {
                 $history = new PurchaseHistoryModel();
                 $customerId = (int) $_SESSION['customer_id'];
-                $itemNames = $history->itemNames($customerId);
+                $counts = $history->itemCounts($customerId);
+                $itemNames = array_keys($counts);
+                // "Most bought" shortcuts: the 5 items with the most units, once there is a choice to make.
+                if (count($counts) > 1) {
+                    arsort($counts);
+                    $topItems = array_slice(array_keys($counts), 0, 5);
+                }
                 if (mb_strlen($itemSearch) > 50) {
                     $itemError = 'Search for at most 50 characters.';
                 } elseif ($itemSearch !== '') {
@@ -279,6 +418,144 @@ class CheckoutController
             http_response_code(503);
             echo 'Your account is temporarily unavailable. Please reload the page.';
         }
+    }
+
+    /**
+     * GET /account/orders/export: the receipts of the Orders tab's period as a CSV file,
+     * one row per item line. Same filters as the page, so the file matches the screen.
+     */
+    public function ordersExport(): void
+    {
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: /login');
+            return;
+        }
+        [$filters, $from, $to] = $this->orderPeriod();
+        if ($from === null || $to === null || $from > $to) {
+            http_response_code(422);
+            echo 'Choose a valid date range (\'from\' must be before \'to\').';
+            return;
+        }
+        try {
+            $receipts = (new PurchaseHistoryModel())->receipts((int) $_SESSION['customer_id'], $from, $to);
+        } catch (RuntimeException $error) {
+            http_response_code(503);
+            echo 'Your orders are temporarily unavailable. Please try again.';
+            return;
+        }
+        $local = new DateTimeZone(date_default_timezone_get());
+        $rows = [];
+        foreach ($receipts as $receipt) {
+            $when = (new DateTimeImmutable($receipt['purchased_at']))->setTimezone($local);
+            foreach ($receipt['items'] as $line) {
+                $rows[] = [
+                    $when->format('Y-m-d'),
+                    $when->format('H:i'),
+                    'SS-' . str_pad((string) $receipt['id'], 6, '0', STR_PAD_LEFT),
+                    $line['name'],
+                    $line['quantity'],
+                    number_format($line['unit_price'], 2, '.', ''),
+                    number_format($line['amount'], 2, '.', ''),
+                    number_format($receipt['total'], 2, '.', ''),
+                    $receipt['points_earned'],
+                    $receipt['points_redeemed'],
+                ];
+            }
+        }
+        $this->sendCsv(
+            'orders-' . $from->format('Y-m-d') . '-to-' . $to->format('Y-m-d') . '.csv',
+            ['Date', 'Time', 'Order reference', 'Product', 'Quantity', 'Unit price', 'Amount', 'Receipt total paid', 'Points earned', 'Points used'],
+            $rows
+        );
+    }
+
+    /**
+     * GET /account/prices/export?item=... or ?q=...: the Price history tab's result as a CSV file,
+     * one row per purchase of each item shown.
+     */
+    public function pricesExport(): void
+    {
+        if (!isset($_SESSION['customer_id'])) {
+            header('Location: /login');
+            return;
+        }
+        $customerId = (int) $_SESSION['customer_id'];
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $choice = trim((string) ($_GET['item'] ?? ''));
+        try {
+            $history = new PurchaseHistoryModel();
+            if ($search !== '' && mb_strlen($search) <= 50) {
+                $items = $history->itemHistory($customerId, $search);
+            } elseif ($choice !== '' && array_key_exists($choice, $history->itemCounts($customerId))) {
+                $items = $history->itemHistory($customerId, $choice, true);
+            } else {
+                http_response_code(422);
+                echo 'Choose an item from the list or search part of its name.';
+                return;
+            }
+        } catch (RuntimeException $error) {
+            http_response_code(503);
+            echo 'Your price history is temporarily unavailable. Please try again.';
+            return;
+        }
+        $local = new DateTimeZone(date_default_timezone_get());
+        $rows = [];
+        foreach ($items as $item) {
+            foreach ($item['purchases'] as $purchase) {
+                $when = (new DateTimeImmutable($purchase['purchased_at']))->setTimezone($local);
+                $rows[] = [
+                    $item['name'],
+                    $when->format('Y-m-d'),
+                    $when->format('H:i'),
+                    number_format($purchase['unit_price'], 2, '.', ''),
+                    $purchase['quantity'],
+                    $purchase['change'] === null ? '' : number_format($purchase['change'], 2, '.', ''),
+                    $purchase['change_percent'] === null ? '' : number_format($purchase['change_percent'], 1, '.', ''),
+                    'SS-' . str_pad((string) $purchase['purchase_id'], 6, '0', STR_PAD_LEFT),
+                ];
+            }
+        }
+        $name = $search !== '' ? $search : $choice;
+        $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($name)), '-');
+        $this->sendCsv(
+            'price-history-' . ($slug !== '' ? $slug : 'items') . '.csv',
+            ['Item', 'Date', 'Time', 'Unit price', 'Quantity', 'Change since previous purchase', 'Change (%)', 'Order reference'],
+            $rows
+        );
+    }
+
+    /** The Orders tab's period from the URL: [filters, from, to]. The last 30 days by default; a single day is from = to. */
+    private function orderPeriod(): array
+    {
+        $today = (new DateTimeImmutable('today'))->format('Y-m-d');
+        $filters = [
+            'mode' => ($_GET['mode'] ?? 'range') === 'day' ? 'day' : 'range',
+            'day' => (string) ($_GET['day'] ?? $today),
+            'from' => (string) ($_GET['from'] ?? (new DateTimeImmutable('-29 days'))->format('Y-m-d')),
+            'to' => (string) ($_GET['to'] ?? $today),
+        ];
+        $from = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['from']);
+        $to = $this->date($filters['mode'] === 'day' ? $filters['day'] : $filters['to']);
+
+        return [$filters, $from, $to];
+    }
+
+    /**
+     * Sends a CSV download (UTF-8 with BOM so Excel shows accents). Text (not numbers like -0.20)
+     * that starts with = + - @ gets a leading ' so a spreadsheet never runs it as a formula.
+     */
+    private function sendCsv(string $filename, array $header, array $rows): void
+    {
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, $header, ',', '"', '');
+        foreach ($rows as $row) {
+            $row = array_map(static fn ($cell) => is_string($cell) && !is_numeric($cell) && preg_match('/^[=+\-@\t\r]/', $cell) ? "'" . $cell : $cell, $row);
+            fputcsv($out, $row, ',', '"', '');
+        }
+        fclose($out);
     }
 
     /** "2026-11-20" -> date, anything else -> null. */

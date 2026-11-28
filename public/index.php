@@ -54,11 +54,15 @@ function view(string $name): void
 
 $routes = [
     'POST /account/membership' => [App\Controllers\CheckoutController::class, 'membership'],
+    'POST /account/profile' => [App\Controllers\CheckoutController::class, 'profile'],
+    'POST /account/password' => [App\Controllers\CheckoutController::class, 'password'],
     'GET /order-confirmation' => fn() => ORDER_TRACKING ? view('order-confirmation') : header('Location: /account'),
     'GET /checkout' => [App\Controllers\CheckoutController::class, 'index'],
     'POST /checkout' => [App\Controllers\CheckoutController::class, 'pay'],
     'GET /api/members/lookup' => [App\Controllers\CheckoutController::class, 'memberLookup'],
     'GET /account' => [App\Controllers\CheckoutController::class, 'account'],
+    'GET /account/orders/export' => [App\Controllers\CheckoutController::class, 'ordersExport'],
+    'GET /account/prices/export' => [App\Controllers\CheckoutController::class, 'pricesExport'],
     'GET /receipt' => [App\Controllers\CheckoutController::class, 'receipt'],
     'GET /' => fn() => header('Location: ' . (isset($_SESSION['customer_id']) ? (empty($_SESSION['is_admin']) ? '/account' : '/products') : '/login')),
 
@@ -69,6 +73,10 @@ $routes = [
     'POST /register' => [AuthController::class, 'register'],
     'POST /login' => [AuthController::class, 'login'],
     'GET /logout' => [AuthController::class, 'logout'],
+    'GET /forgot-password' => [App\Controllers\PasswordResetController::class, 'forgotForm'],
+    'POST /forgot-password' => [App\Controllers\PasswordResetController::class, 'sendLink'],
+    'GET /reset-password' => [App\Controllers\PasswordResetController::class, 'resetForm'],
+    'POST /reset-password' => [App\Controllers\PasswordResetController::class, 'reset'],
 
     'GET /thresholds' => fn() => header('Location: /dashboard'), // thresholds are edited on the dashboard
     'POST /thresholds' => [ThresholdController::class, 'update'],
@@ -103,6 +111,11 @@ $routes = [
     // Phase 4: 
     //reports (admin only)
     'GET /api/reports/sales' => [SalesReportController::class, 'sales'],
+    'GET /customers' => [App\Controllers\CustomerController::class, 'index'],
+    'GET /customers/export' => [App\Controllers\CustomerController::class, 'export'],
+    'GET /customers/edit' => [App\Controllers\CustomerController::class, 'edit'],
+    'POST /customers/update' => [App\Controllers\CustomerController::class, 'update'],
+    'POST /customers/reset-password' => [App\Controllers\CustomerController::class, 'sendReset'],
     'GET /reports/sales' => [App\Controllers\SalesReportController::class, 'page'],
     'GET /reports/sales/export' => [SalesReportController::class, 'export'],
 

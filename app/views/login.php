@@ -14,6 +14,7 @@ if (isset($_SESSION['customer_id'])) {
 
     <title data-i18n>SuperStore - Sign in</title>
 
+    <script src="/assets/js/theme.js"></script>
     <link rel="stylesheet" href="assets/css/style.css">
 <script src="/assets/js/language.js" defer></script>
 </head>
@@ -21,7 +22,7 @@ if (isset($_SESSION['customer_id'])) {
 <body class="auth-page">
 
 <div class="container">
-    <div class="language-control"><button type="button" id="language-switch" aria-label="Passer au fran&#231;ais">FR</button></div>
+    <div class="language-control"><button type="button" id="language-switch" aria-label="Passer au fran&#231;ais">FR</button><button type="button" class="theme-switch" aria-label="Switch to dark mode" data-i18n-aria-label="Switch to dark mode"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div>
 
     <h1>SuperStore</h1>
     <p class="subtitle"><span data-i18n>Sign in to your account</span></p>
@@ -53,6 +54,7 @@ if (isset($_SESSION['customer_id'])) {
                 required
             >
             <p class="field-error" id="error-password"></p>
+            <p class="field-hint"><a href="/forgot-password"><span data-i18n>Forgot your password?</span></a></p>
         </div>
 
         <label class="show-password" for="showPassword">

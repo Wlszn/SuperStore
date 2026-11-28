@@ -117,8 +117,6 @@
 
     const inventory = document.querySelector('[data-inventory-url]');
     if (inventory) {
-        document.querySelector('[data-download-pdf]')?.addEventListener('click', () => window.print());
-
         const lowStock = Number(inventory.dataset.lowStock);
         const liveStatus = document.getElementById('inventory-live-status');
         const numberFormat = new Intl.NumberFormat(document.documentElement.lang || 'en');
@@ -460,5 +458,35 @@
         window.addEventListener('pagehide', () => stopFeed?.());
         renderTags();
         startReader();
+    }
+    // Orders tab: a long receipt shows its first lines; the button shows or hides the rest.
+    for (const button of document.querySelectorAll('[data-show-all]')) {
+        const extras = button.closest('.receipt-card').querySelectorAll('.receipt-extra');
+        const toggle = (open) => {
+            for (const row of extras) row.hidden = !open;
+            window.setLocalizedText(button, open ? button.dataset.less : button.dataset.more);
+            button.setAttribute('aria-expanded', String(open));
+        };
+        button.hidden = false;
+        toggle(false);
+        button.addEventListener('click', () => toggle(button.getAttribute('aria-expanded') !== 'true'));
+    }
+    // Customers page (admin): the search box hides the rows that do not match.
+    const customerSearch = document.querySelector('[data-customer-search]');
+    customerSearch?.addEventListener('input', () => {
+        const query = customerSearch.value.trim().toLowerCase();
+        let visible = 0;
+        for (const row of document.querySelectorAll('[data-customer]')) {
+            row.hidden = !row.dataset.search.toLowerCase().includes(query);
+            if (!row.hidden) visible++;
+        }
+        document.getElementById('no-customers').hidden = visible > 0;
+        window.setLocalizedText(document.getElementById('customer-count'), visible + (visible === 1 ? ' customer' : ' customers'));
+    });
+
+    // "Download PDF" (products, orders, price history) and "Print my card" open the browser's print window,
+    // where the user picks Save as PDF. The @media print rules in inventory.css choose what is printed.
+    for (const button of document.querySelectorAll('[data-download-pdf], [data-print-card]')) {
+        button.addEventListener('click', () => window.print());
     }
 })();

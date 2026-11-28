@@ -15,6 +15,7 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title <?= !isset($product) || $title !== $product['name'] ? 'data-i18n' : '' ?>><?= $e($title) ?> · SuperStore</title>
+    <script src="/assets/js/theme.js"></script>
     <link rel="stylesheet" href="/assets/css/inventory.css">
     <script src="/assets/js/form-utils.js" defer></script>
     <script src="/assets/js/language.js" defer></script>
@@ -42,6 +43,9 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
                 <a href="/dashboard" class="nav-link <?= $section === 'fridges' ? 'current' : '' ?>" <?= $section === 'fridges' ? 'aria-current="page"' : '' ?>>
                     <span class="nav-icon" aria-hidden="true">❄</span> <span data-i18n>Fridge dashboard</span>
                 </a>
+                <a href="/customers" class="nav-link <?= $section === 'customers' ? 'current' : '' ?>" <?= $section === 'customers' ? 'aria-current="page"' : '' ?>>
+                    <span class="nav-icon" aria-hidden="true">◉</span> <span data-i18n>Customers</span>
+                </a>
                 <a href="/reports/sales" class="nav-link <?= $section === 'sales' ? 'current' : '' ?>" <?= $section === 'sales' ? 'aria-current="page"' : '' ?>>
                     <span class="nav-icon" aria-hidden="true">$</span> <span data-i18n>Sales report</span>
                 </a>
@@ -56,6 +60,7 @@ $money = static fn ($value): string => '$' . number_format((float) $value, 2);
     <main id="main">
         <div class="topbar">
             <button type="button" class="button" id="language-switch" aria-label="Change language">FR</button>
+            <button type="button" class="button theme-switch" aria-label="Switch to dark mode" data-i18n-aria-label="Switch to dark mode"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
             <?php if ($section === 'fridges'): ?>
                 <a href="/dashboard"><span data-i18n>Monitoring</span></a>
             <?php elseif ($section === 'products' || $section === 'receive'): ?>

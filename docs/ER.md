@@ -16,7 +16,8 @@ Editable source: [`SuperStore-ERD.drawio`](SuperStore-ERD.drawio) (open it at ap
 | `purchases` | One checkout, which is one receipt | Self-checkout |
 | `purchase_items` | One line on a receipt (product, quantity, price) | Self-checkout |
 | `rfid_scans` | One tag read by the RFID reader | Management, self-checkout |
-| `receipt_emails` | One receipt email to send (one per member purchase), with its status and attempts | Receipt worker |
+| `receipt_emails` | One receipt email per member purchase: sent or failed | Self-checkout |
+| `password_resets` | One password reset link: a hash of its token, when it expires and when it was used | Accounts |
 | `product_stock` *(view)* | A product with its `in_stock` = its items not sold yet | Management |
 
 ## Relationships

@@ -188,6 +188,30 @@ class CustomerModel
         return $errors;
     }
 
+    /**
+     * The password rules for sign-up and for changing a password: field => message errors.
+     */
+    public static function validatePassword(string $password, string $confirmPassword): array
+    {
+        $errors = [];
+
+        if ($password === '') {
+            $errors['password'] = 'Please choose a password.';
+        } elseif (strlen($password) < 8) {
+            $errors['password'] = 'Password must be at least 8 characters long.';
+        } elseif (!preg_match('/[A-Za-z]/', $password) || !preg_match('/[0-9]/', $password)) {
+            $errors['password'] = 'Password must contain at least one letter and one number.';
+        }
+
+        if ($confirmPassword === '') {
+            $errors['confirm_password'] = 'Please type your password again to confirm it.';
+        } elseif ($password !== '' && $password !== $confirmPassword) {
+            $errors['confirm_password'] = 'The two passwords do not match. Please type them again.';
+        }
+
+        return $errors;
+    }
+
     public function isValid(): bool
     {
         return self::validateData(trim($this->name), trim($this->email), trim($this->phone), trim($this->address)) === [];
