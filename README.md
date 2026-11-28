@@ -53,8 +53,8 @@ The application has two sides:
 ## Architecture
 
 ```
-ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ◀──HTTP──▶ ┐
-RFID reader ───────────▶ reader script ────HTTP────────────▶ │ PHP app (Pi) ──REST──▶ Supabase
+ESP32 + DHT11 ──MQTT──▶ Mosquitto ──▶ monitor.py ◀──HTTP───▶ ┐
+RFID reader ──────────▶ RFID_Scanner.py ───HTTP────────────▶ │ PHP app (Pi) ──REST──▶ Supabase
 Barcode scanner ──▶ browser (types like a keyboard) ───────▶ ┘
                          monitor.py ──GPIO──▶ motor driver ──▶ DC motor
 ```
@@ -127,7 +127,11 @@ Open `scripts/esp32_sensor/esp32_sensor.ino` in the Arduino IDE, install **PubSu
 
 ### 5. RFID reader
 
-See [CF600 reader setup](docs/RFID.md) for the USB SDK bridge used by the checkout and product pages.
+Set the reader to **CDC_COM** once (see [CF600 reader setup](docs/RFID.md)), plug it into the Pi, then in another terminal:
+
+```bash
+python3 scripts/RFID_Scanner.py --port /dev/ttyACM0
+```
 
 ### 6. Checkout demo and receipt email
 
@@ -159,7 +163,7 @@ Design, relationships and examples: [`docs/ER.md`](docs/ER.md). Editable diagram
 | 2 × ESP32 + DHT11 | 2 | Wi-Fi (MQTT) |
 | DC motor + driver | 2 | GPIO 22 (enable), 27 (in 1), 17 (in 2) |
 | USB barcode scanner | 3 | USB (keyboard mode) |
-| Chafon CF600 RFID reader | 3 | USB (SDK bridge) |
+| Chafon CF600 RFID reader | 3 | USB (virtual COM port, `/dev/ttyACM0`) |
 
 All pins use BCM numbering on a Raspberry Pi 5.
 

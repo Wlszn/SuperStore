@@ -4,3 +4,6 @@
 .DS_Store
 
 .vscode/settings.json
+
+# Python bytecode
+__pycache__/

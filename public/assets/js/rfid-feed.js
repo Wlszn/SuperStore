@@ -1,5 +1,5 @@
 // Shared by the self-checkout and the receive-stock page.
-// scripts/rfid.py posts every tag the reader sees to /api/scans; this polls that feed and
+// scripts/RFID_Scanner.py posts every tag the reader sees to /api/scans; this polls that feed and
 // hands the page each new batch at once, already looked up (/api/items/lookup).
 (() => {
     const POLL_MS = 500;

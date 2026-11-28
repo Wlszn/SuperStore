@@ -7,7 +7,7 @@ use App\Models\ScanModel;
 use RuntimeException;
 
 /**
- * RFID tags read by scripts/rfid.py on the Pi.
+ * RFID tags read by scripts/RFID_Scanner.py on the Pi.
  *
  *   POST /api/scans                  one tag, or every tag the reader saw at once
  *   GET  /api/scans/latest           the most recent scan (start from its id)
