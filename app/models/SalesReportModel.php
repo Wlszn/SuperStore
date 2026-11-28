@@ -89,4 +89,46 @@ class SalesReportModel{
             'revenue' => (float) $r['revenue'],
         ], $rows);
     }
+
+    /** All-time sales rank and per-day unit sales for one product in a date range. */
+    public function productReport(int $productId, DateTimeImmutable $from, DateTimeImmutable $to): array
+    {
+        [$status, $report] = supa_request('POST', 'rpc/product_sales_report', null, [
+            'p_product_id' => $productId,
+            'p_from' => $from->format('Y-m-d'),
+            'p_to' => $to->format('Y-m-d'),
+        ]);
+        if (
+            $status !== 200
+            || !is_array($report)
+            || !isset($report['sales_rank'], $report['ranked_product_count'], $report['all_time_units_sold'])
+            || !is_array($report['weekly_units'] ?? null)
+        ) {
+            error_log('product-sales-report failed (HTTP ' . $status . '): ' . json_encode($report));
+            throw new RuntimeException('Could not load product sales history.');
+        }
+
+        $weeklyUnits = [];
+        foreach ($report['weekly_units'] as $row) {
+            if (!is_array($row) || !isset($row['date'], $row['units_sold']) || !is_numeric($row['units_sold'])) {
+                error_log('product-sales-report returned an invalid weekly series: ' . json_encode($report));
+                throw new RuntimeException('Could not load product sales history.');
+            }
+            $weeklyUnits[] = [
+                'date' => (string) $row['date'],
+                'units_sold' => (int) $row['units_sold'],
+            ];
+        }
+        if (count($weeklyUnits) !== 7) {
+            error_log('product-sales-report returned an invalid weekly series: ' . json_encode($report));
+            throw new RuntimeException('Could not load product sales history.');
+        }
+
+        return [
+            'sales_rank' => (int) $report['sales_rank'],
+            'ranked_product_count' => (int) $report['ranked_product_count'],
+            'all_time_units_sold' => (int) $report['all_time_units_sold'],
+            'weekly_units' => $weeklyUnits,
+        ];
+    }
 }

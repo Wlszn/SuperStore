@@ -155,3 +155,57 @@ $$;
 
 REVOKE ALL ON FUNCTION sales_trend(date, date, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sales_trend(date, date, text, text) TO service_role;
+
+-- One product's all-time unit-sales rank and daily unit sales for a supplied week.
+-- Week boundaries are store days in Montreal time; both endpoints are included.
+CREATE OR REPLACE FUNCTION product_sales_report(p_product_id integer, p_from date, p_to date)
+RETURNS jsonb
+LANGUAGE sql STABLE
+SET search_path = public
+AS $$
+  WITH all_time_sales AS (
+    SELECT pi.product_id, SUM(pi.quantity)::int AS units_sold
+    FROM purchase_items pi
+    JOIN purchases pu ON pu.id = pi.purchase_id
+    WHERE pi.product_id IS NOT NULL
+    GROUP BY pi.product_id
+  ),
+  ranked_products AS (
+    SELECT p.id AS product_id,
+           RANK() OVER (ORDER BY COALESCE(s.units_sold, 0) DESC) AS sales_rank,
+           COALESCE(s.units_sold, 0)::int AS units_sold
+    FROM products p
+    LEFT JOIN all_time_sales s ON s.product_id = p.id
+  ),
+  week_days AS (
+    SELECT series.day::date AS day
+    FROM generate_series(p_from::timestamp, p_to::timestamp, interval '1 day') AS series(day)
+  ),
+  daily_sales AS (
+    SELECT (pu.purchased_at AT TIME ZONE 'America/Toronto')::date AS day,
+           SUM(pi.quantity)::int AS units_sold
+    FROM purchase_items pi
+    JOIN purchases pu ON pu.id = pi.purchase_id
+    WHERE pi.product_id = p_product_id
+      AND pu.purchased_at >= (p_from::timestamp AT TIME ZONE 'America/Toronto')
+      AND pu.purchased_at < ((p_to + 1)::timestamp AT TIME ZONE 'America/Toronto')
+    GROUP BY 1
+  )
+  SELECT jsonb_build_object(
+    'product_id', p_product_id,
+    'sales_rank', (SELECT sales_rank FROM ranked_products WHERE product_id = p_product_id),
+    'ranked_product_count', (SELECT COUNT(*) FROM ranked_products),
+    'all_time_units_sold', (SELECT units_sold FROM ranked_products WHERE product_id = p_product_id),
+    'weekly_units', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'date', d.day,
+        'units_sold', COALESCE(s.units_sold, 0)
+      ) ORDER BY d.day)
+      FROM week_days d
+      LEFT JOIN daily_sales s USING (day)
+    ), '[]'::jsonb)
+  );
+$$;
+
+REVOKE ALL ON FUNCTION product_sales_report(integer, date, date) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION product_sales_report(integer, date, date) TO service_role;

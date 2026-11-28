@@ -7,8 +7,10 @@ use App\Models\ItemModel;
 use App\Models\ProductModel;
 use App\Models\ReceptionModel;
 use App\Models\ScanModel;
+use App\Models\SalesReportModel;
 use InvalidArgumentException;
 use RuntimeException;
+use DateTimeImmutable;
 
 /**
  * Product types, tagged items and inventory. Every page and action is admin only,
@@ -154,6 +156,8 @@ class ProductController
             return;
         }
 
+        $weekStart = new DateTimeImmutable('monday this week');
+        $weekEnd = $weekStart->modify('+6 days');
         try {
             $receptions = $this->receptions->forProduct($product['id']);
             $items = $this->items->inStock($product['id']);
@@ -162,7 +166,23 @@ class ProductController
             return;
         }
 
-        $this->render('products/show', ['product' => $product, 'receptions' => $receptions, 'items' => $items]);
+        $salesReport = null;
+        $salesReportError = null;
+        try {
+            $salesReport = (new SalesReportModel())->productReport($product['id'], $weekStart, $weekEnd);
+        } catch (RuntimeException $e) {
+            $salesReportError = 'Sales performance is unavailable. Check Supabase reports setup and try again.';
+        }
+
+        $this->render('products/show', [
+            'product' => $product,
+            'receptions' => $receptions,
+            'items' => $items,
+            'salesReport' => $salesReport,
+            'salesReportError' => $salesReportError,
+            'weekStart' => $weekStart,
+            'weekEnd' => $weekEnd,
+        ]);
     }
 
     // GET /products/receive[?id=5]: pick a product (pre-selected when id is given)

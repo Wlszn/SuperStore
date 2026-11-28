@@ -22,6 +22,42 @@ $barcode = App\Services\Barcode::code128($upc);
     <div><dt><span data-i18n>Category</span></dt><dd class="code"><span data-i18n><?= $e($product['category']) ?></span></dd></div>
 </dl>
 
+<?php if ($salesReport !== null): ?>
+    <?php
+    $weeklyUnits = $salesReport['weekly_units'];
+    $weeklyTotal = array_sum(array_column($weeklyUnits, 'units_sold'));
+    $weeklyMax = max(1, max(array_column($weeklyUnits, 'units_sold')));
+    $weekLabel = $weekStart->format('M j') . ' – ' . $weekEnd->format('M j, Y');
+    ?>
+    <section class="panel product-performance" aria-labelledby="product-performance-heading">
+        <div class="section-heading">
+            <h2 id="product-performance-heading"><span data-i18n>Sales performance</span></h2>
+            <p class="hint"><span data-i18n>Product ranking and purchases</span></p>
+        </div>
+        <dl class="stats four">
+            <div><dt><span data-i18n>All-time sales rank</span></dt><dd>#<?= number_format($salesReport['sales_rank']) ?> / <?= number_format($salesReport['ranked_product_count']) ?></dd></div>
+            <div><dt><span data-i18n>All-time units sold</span></dt><dd><?= number_format($salesReport['all_time_units_sold']) ?></dd></div>
+            <div><dt><span data-i18n>Units sold this week</span></dt><dd><?= number_format($weeklyTotal) ?></dd></div>
+            <div><dt><span data-i18n>Week</span></dt><dd class="period"><?= $e($weekLabel) ?></dd></div>
+        </dl>
+        <section class="weekly-sales-panel" aria-labelledby="weekly-sales-heading">
+            <h3 id="weekly-sales-heading"><span data-i18n>Daily purchases this week</span></h3>
+            <ol class="weekly-sales-chart" aria-label="Units sold each day this week" data-i18n-aria-label="Units sold each day this week">
+                <?php foreach ($weeklyUnits as $day): ?>
+                    <?php $dayLabel = date('D', strtotime($day['date'])); ?>
+                    <li>
+                        <span class="weekly-sales-value"><?= number_format($day['units_sold']) ?></span>
+                        <span class="weekly-sales-track" aria-hidden="true"><span class="weekly-sales-bar" style="height: <?= number_format($day['units_sold'] / $weeklyMax * 100, 2, '.', '') ?>%"></span></span>
+                        <time datetime="<?= $e($day['date']) ?>"><span data-i18n><?= $e($dayLabel) ?></span><small><?= $e(date('M j', strtotime($day['date']))) ?></small></time>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
+        </section>
+    </section>
+<?php else: ?>
+    <p class="notice error" role="alert"><span data-i18n><?= $e($salesReportError) ?></span></p>
+<?php endif; ?>
+
 <?php if ($upc !== ''): ?>
     <section class="panel editor-body barcode-panel" aria-labelledby="barcode-heading">
         <div class="page-heading">

@@ -20,12 +20,14 @@ Each page receives the variables listed, plus `$csrfToken`. Until a view exists,
 | `GET /products` | `products/index.php` | `$products`, `$lowStock` |
 | `GET /products/create` | `products/form.php` | `$product = null`, `$categories` |
 | `GET /products/edit?id=5` | `products/form.php` | `$product`, `$categories` |
-| `GET /products/show?id=5` | `products/show.php` | `$product`, `$items` (tags in stock), `$receptions` |
+| `GET /products/show?id=5` | `products/show.php` | `$product`, `$items` (tags in stock), `$receptions`, `$salesReport` (nullable), `$salesReportError`, `$weekStart`, `$weekEnd` |
 | `GET /products/receive?id=5` | `products/receive.php` | `$products`, `$selectedId` (may be null), `$today` |
 
 - Product (a type): `id, name, category, price, upc, producer, image_url, in_stock, low_stock`
 - Item (one RFID tag): `epc, product_id, reception_id, purchase_id` (in stock while `purchase_id` is null)
 - Reception (a delivery): `id, product_id, quantity, received_at`
+
+The product detail page shows its all-time unit-sales rank and sales for each day of the current Monday–Sunday week. Apply `config/reports.sql` in Supabase to install the `product_sales_report` RPC used by this page.
 
 ### Actions
 
